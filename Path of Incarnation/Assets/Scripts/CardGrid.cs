@@ -54,13 +54,22 @@ public class CardGrid : MonoBehaviour
     /// </param>
     public bool TrySnapFromDraggable(RectTransform cardRT, bool reparentOnSnap = false)
     {
+        return TrySnapFromDraggable(cardRT, reparentOnSnap, out _, out _);
+    }
+
+    // New overload with outs
+    public bool TrySnapFromDraggable(RectTransform cardRT, bool reparentOnSnap, out RectTransform snappedParent, out Vector2 snappedLocal)
+    {
+        snappedParent = null;
+        snappedLocal = Vector2.zero;
+
         if (!cardRT || snapTargets == null || snapTargets.Count == 0 || !rootCanvas)
             return false;
 
         // 1) Card center in screen space
         Vector2 cardScreen = RectCenterScreen(cardRT);
 
-        // 2) Find nearest target in screen space
+        // 2) Find nearest target
         RectTransform best = null;
         float bestDist = float.MaxValue;
 
@@ -76,23 +85,25 @@ public class CardGrid : MonoBehaviour
             }
         }
 
-        // 3) Too far? No snap.
         if (!best || bestDist > snapDistance)
             return false;
 
-        // 4) Compute destination: center of the chosen target, expressed in the parent we'll use
+        // 4) Compute destination
         RectTransform parentForLocal = reparentOnSnap
-            ? (RectTransform)transform // grid container as parent
+            ? (RectTransform)transform
             : (RectTransform)cardRT.parent;
 
-        // Reparent first if requested (keep world position so conversions are consistent)
         if (reparentOnSnap && cardRT.parent != parentForLocal)
             cardRT.SetParent(parentForLocal, worldPositionStays: true);
 
         Vector2 targetScreen = RectCenterScreen(best);
         if (RectTransformUtility.ScreenPointToLocalPointInRectangle(parentForLocal, targetScreen, UICamera, out var local))
         {
-            DOTween.Kill(cardRT); // stop any ongoing move on this card
+            DOTween.Kill(cardRT);
+
+            // Report back where we snapped
+            snappedParent = parentForLocal;
+            snappedLocal = local;
 
             if (animateSnap)
             {
