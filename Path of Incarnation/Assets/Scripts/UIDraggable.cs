@@ -179,19 +179,17 @@ public class UIDraggable : MonoBehaviour,
         if (HandBlocked || !CanDrag()) return;
         if (!CanDrag()) return;
 
-        if (handManager && cameFromHand)
-            handManager.SetHandHover(true);
+        // ✂️ Removed the forced SetHandHover(true) here.
 
         CompleteInteraction();
 
         if (handManager) StartCoroutine(DelayedHoverRefresh());
     }
 
-
     private IEnumerator DelayedHoverRefresh()
     {
         yield return null; // let detach/reparent finish
-        handManager.RefreshHoverFromPointer(rt);
+        handManager?.RefreshHoverFromPointer(rt); // ignore this card while deciding hover
     }
 
     public void OnPointerUp(PointerEventData e)
@@ -301,6 +299,14 @@ public class UIDraggable : MonoBehaviour,
         SetScaleOriginal(dragScaleDuration);
         if (handManager) handManager.SetDragging(rt, false);
 
+        // This card must not count toward hover while it flies back
+        if (countsForHandHover && handManager)
+        {
+            countsForHandHover = false;
+            handManager.CardHoverExit(rt);
+        }
+        handManager?.RefreshHoverFromPointer(rt); // recompute while ignoring this card
+
         handManager.ReturnCardToHand(rt, onLaidOut: () =>
         {
             isInSlot = false;
@@ -399,6 +405,4 @@ public class UIDraggable : MonoBehaviour,
         if (setScaleToSlot) rt.localScale = new Vector3(slotScale, slotScale, slotScale);
         state = DragState.Snapped;
     }
-
-
 }

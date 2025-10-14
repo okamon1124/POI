@@ -25,6 +25,12 @@ public class HandUiManager : MonoBehaviour
     [SerializeField] private float handDownOffset = -150f;
     [SerializeField] private float handTweenDuration = 0.25f;
 
+    [Header("Hand Hover Zone (optional)")]
+    [Tooltip("If assigned, the mouse must be inside this rect for the hand to hover.")]
+    [SerializeField] private RectTransform hoverZone;
+    [Tooltip("If no hoverZone is assigned, use this percentage band from the bottom of the screen.")]
+    [Range(0f, 0.5f)][SerializeField] private float fallbackHoverBand01 = 0.25f;
+
     private float handLift01 = 0f;
     private Tween handTween;
 
@@ -62,7 +68,6 @@ public class HandUiManager : MonoBehaviour
             Debug.LogError("HandUiManager: Assign a SplineContainer.");
             enabled = false;
         }
-
     }
 
 #if UNITY_EDITOR
@@ -73,6 +78,19 @@ public class HandUiManager : MonoBehaviour
             DrawCard();
     }
 #endif
+
+    // Watchdog: if a layout tween was killed, unblock layout updates
+    private void LateUpdate()
+    {
+        if (handAnimating == null) return;
+
+        string layoutId = $"hand_layout_{handAnimating.GetInstanceID()}";
+        if (!DOTween.IsTweening(layoutId))
+        {
+            handAnimating = null;                // unblock SetHandHover layout updates
+            UpdateCardPositions(animateAll: false);
+        }
+    }
 
     // ─────────────────────────────────────────────────────────────
     // Public API
@@ -149,6 +167,10 @@ public class HandUiManager : MonoBehaviour
             rect.SetSiblingIndex(targetIndex);
 
         handAnimating = rect;
+
+        // Ensure this returning card can't trigger hover
+        hoveredCards.Remove(rect);
+        RefreshHoverFromPointer(ignore: rect);
 
         if (blockInteractionsDuringReturn) PushBusy();   // 👈 start block
 
@@ -275,21 +297,35 @@ public class HandUiManager : MonoBehaviour
         if (hoveredCards.Count == 0) SetHandHover(false);
     }
 
+    /// <summary>
+    /// Recompute hover based on current pointer pos.
+    /// Only lifts if the pointer is in the hover zone AND over a hand card.
+    /// </summary>
     public void RefreshHoverFromPointer(RectTransform ignore = null)
     {
         if (!EventSystem.current) return;
 
         Vector2 mouse = Input.mousePosition;
+
+        // zone test
+        bool inZone;
+        if (hoverZone)
+            inZone = RectTransformUtility.RectangleContainsScreenPoint(hoverZone, mouse, CanvasCam);
+        else
+            inZone = mouse.y <= (Screen.height * fallbackHoverBand01);
+
         bool overHandCard = false;
 
-        foreach (var rect in handCards)
+        if (inZone)
         {
-            if (!rect || rect == ignore) continue; // ✅ always ignore the released card
-
-            if (RectTransformUtility.RectangleContainsScreenPoint(rect, mouse, CanvasCam))
+            foreach (var rect in handCards)
             {
-                overHandCard = true;
-                break;
+                if (!rect || rect == ignore) continue; // ✅ always ignore the released/returning card
+                if (RectTransformUtility.RectangleContainsScreenPoint(rect, mouse, CanvasCam))
+                {
+                    overHandCard = true;
+                    break;
+                }
             }
         }
 
