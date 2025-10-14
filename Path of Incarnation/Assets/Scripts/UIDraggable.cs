@@ -2,26 +2,27 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using DG.Tweening;
+using System.Collections;
 
 public class UIDraggable : MonoBehaviour,
     IBeginDragHandler, IDragHandler, IEndDragHandler,
-    IPointerDownHandler, IPointerUpHandler, IInitializePotentialDragHandler
+    IPointerDownHandler, IPointerUpHandler, IInitializePotentialDragHandler, IPointerEnterHandler, IPointerExitHandler
 {
-    // ─────────────────────────────────────────────────────────────
-    // Runtime references
-    // ─────────────────────────────────────────────────────────────
-    private CardGrid cardGrid; // found at runtime
+    [Header("Grid (optional, found at runtime)")]
+    private CardGrid cardGrid;
 
     [Header("Snap")]
-    [Tooltip("If true, reparent to the grid container before positioning in a slot.")]
+    [Tooltip("If true, reparent to Field when snapped to a slot.")]
     [SerializeField] private bool reparentOnSnap = true;
 
-    [Header("Hand (optional)")]
-    [Tooltip("Assign if this card participates in a world-space hand layout.")]
-    public HandManagerUIWorldSpace handManager;
+    [Header("Field Parent")]
+    [Tooltip("Set this to your 'Field' transform in the scene.")]
+    private Transform fieldParent;
+
+    [Header("Hand (optional)"), HideInInspector]
+    public HandUiManager handManager;
 
     [Header("Drag / Slot Visuals")]
-    [Tooltip("ABSOLUTE scale while dragging or sitting in a slot.")]
     [SerializeField] private float slotScale = 1.1f;
     [SerializeField] private float dragScaleDuration = 0.08f;
 
@@ -29,35 +30,38 @@ public class UIDraggable : MonoBehaviour,
     [SerializeField] private float missReturnDuration = 0.18f;
     [SerializeField] private Ease missReturnEase = Ease.OutQuad;
 
-    // ─────────────────────────────────────────────────────────────
-    // Internal state
-    // ─────────────────────────────────────────────────────────────
+    private enum DragState { Idle, PointerDown, Dragging, ReturningToHand, ReturningToSlot, Snapped }
+    private DragState state = DragState.Idle;
+
     private RectTransform rt;
-    private bool returning;
-    private bool canDrag = true;
-    private bool lightIsDown;
-    private bool pointerActive;           // debounces rapid taps
-
-    public Action dragStarted;
-    public Action dragEnded;
-
-    private Tween moveTween;              // position tween
-    private Tween scaleTween;             // scale tween (dedicated, to avoid races)
     private Vector3 originalScale;
-
-    // Track where the drag started
+    private bool pointerActive;
     private bool cameFromHand;
 
-    // Remember last snapped slot pose (parent + local)
     private RectTransform lastSlotParent;
     private Vector2 lastSlotLocal;
     private bool isInSlot;
 
-    private RectTransform CurrentParent => (RectTransform)rt.parent;
+    public Action dragStarted;
+    public Action dragEnded;
 
-    // ─────────────────────────────────────────────────────────────
-    // Lifecycle
-    // ─────────────────────────────────────────────────────────────
+    private bool isPointerOver;
+
+    private bool countsForHandHover;       // this rect is contributing to hand hover
+
+    private bool IsInHand =>
+        handManager && handManager.Contains(rt) && rt.parent == handManager.transform;
+
+    // tween ids
+    private string POS_ID => $"drag_pos_{rt.GetInstanceID()}";
+    private string SCALE_ID => $"drag_scale_{rt.GetInstanceID()}";
+    private string HAND_LAYOUT_ID => $"hand_layout_{rt.GetInstanceID()}";
+    private string GRID_POS_ID => $"grid_pos_{rt.GetInstanceID()}"; // matches CardGrid
+
+    private bool HandBlocked => handManager && handManager.IsBusy;
+
+    private ReferenceContext context;
+
     private void Awake()
     {
         rt = GetComponent<RectTransform>();
@@ -65,117 +69,155 @@ public class UIDraggable : MonoBehaviour,
         ResolveRuntimeRefs();
     }
 
-    private void OnTransformParentChanged() => ResolveRuntimeRefs();
-
-    /// <summary>Resolve CardGrid reference robustly.</summary>
-    public void ResolveRuntimeRefs()
+    private void Update()
     {
-        // Prefer parent chain (covers case where card lives under a grid root)
-        cardGrid = transform.parent ? transform.parent.GetComponentInChildren<CardGrid>() : null;
-
-        // Same-level (siblings) — look under our immediate parent only; pick closest if multiple
-        if (cardGrid == null && transform.parent)
+        // watchdog: finalize ReturnToHand if hand layout tween vanished
+        if (state == DragState.ReturningToHand && !DOTween.IsTweening(HAND_LAYOUT_ID))
         {
-            CardGrid best = null;
-            float bestSqr = float.PositiveInfinity;
-            foreach (Transform child in transform.parent)
-            {
-                if (child == transform) continue;
-                var cg = child.GetComponent<CardGrid>();
-                if (cg == null) continue;
-                float d2 = (child.position - transform.position).sqrMagnitude;
-                if (d2 < bestSqr) { bestSqr = d2; best = cg; }
-            }
-            cardGrid = best;
+            isInSlot = false;
+            FinishDragVisuals(stayScaled: false);
+            state = DragState.Idle;
         }
-
-        // Last resort: scene search
-        if (cardGrid == null)
-            cardGrid = FindFirstObjectByType<CardGrid>();
-
-        if (cardGrid == null)
-            Debug.LogWarning($"{name}: No CardGrid found (parent/sibling/scene).");
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Pointer / Drag Interfaces
-    // ─────────────────────────────────────────────────────────────
-    public void OnInitializePotentialDrag(PointerEventData e)
+    private void OnTransformParentChanged() => ResolveRuntimeRefs();
+
+    private void ResolveRuntimeRefs()
     {
-        e.useDragThreshold = false;
+        if (!cardGrid && transform.parent)
+            cardGrid = transform.parent.GetComponentInChildren<CardGrid>();
+        if (!cardGrid) cardGrid = FindFirstObjectByType<CardGrid>();
+
+        // Runtime lookup only (no serialization)
+        if (!context)
+            context = GetComponentInParent<ReferenceContext>();
+
+        if (context)
+        {
+            if (!fieldParent) fieldParent = context.FieldParent;
+            if (!cardGrid) cardGrid = context.Grid;
+        }
+
+        if (!cardGrid)
+            Debug.LogWarning($"{name}: No CardGrid found (parent/sibling/scene/context).");
+        if (!fieldParent && reparentOnSnap)
+            Debug.LogWarning($"{name}: Reparent On Snap is ON but Field Parent is NULL (context missing?).");
+    }
+
+    public void OnInitializePotentialDrag(PointerEventData e) => e.useDragThreshold = false;
+
+    public void OnPointerEnter(PointerEventData e)
+    {
+        if (HandBlocked) return;
+        if (isPointerOver) return;
+        isPointerOver = true;
+
+        // Only lift the hand if this card is still in the hand
+        if (handManager && IsInHand && !countsForHandHover)
+        {
+            countsForHandHover = true;
+            handManager.CardHoverEnter(rt);   // uses the coalescing logic
+        }
+    }
+
+    public void OnPointerExit(PointerEventData e)
+    {
+        if (!isPointerOver) return;
+        isPointerOver = false;
+
+        if (countsForHandHover && handManager)
+        {
+            countsForHandHover = false;
+            handManager.CardHoverExit(rt);
+        }
     }
 
     public void OnPointerDown(PointerEventData e)
     {
-        // Ignore taps during a return animation; also debounce rapid repeated downs
-        if (returning || pointerActive) return;
+        if (HandBlocked) return;
+
+        if (state == DragState.ReturningToHand || state == DragState.ReturningToSlot) return;
         pointerActive = true;
 
-        if (!lightIsDown)
-        {
-            dragStarted?.Invoke();
-            lightIsDown = true;
-        }
+        dragStarted?.Invoke();
 
-        KillMoveOnly();
-        rt.SetAsLastSibling(); // bring on top
+        DOTween.Kill(HAND_LAYOUT_ID);
+        rt.SetAsLastSibling();
 
-        // Origin: hand or slot/field?
-        cameFromHand = handManager != null && handManager.Contains(rt);
+        cameFromHand = handManager && handManager.Contains(rt);
         if (cameFromHand) handManager.SetDragging(rt, true);
 
-        // Drag visuals: ABSOLUTE scale and upright
+        rt.localRotation = Quaternion.identity;
         SetScaleAbs(slotScale, dragScaleDuration);
-        rt.localRotation = Quaternion.Euler(0f, 0f, 0f);
 
-        if (cardGrid) cardGrid.SetDrag(rt, true);
-
+        cardGrid?.SetDrag(rt, true);
         MoveToPointerCenter(e);
+
+        state = DragState.PointerDown;
     }
 
     public void OnBeginDrag(PointerEventData e)
     {
-        if (!canDrag || returning) return;
+        if (HandBlocked || !CanDrag()) return;
+        if (!CanDrag()) return;
+        state = DragState.Dragging;
         MoveToPointerCenter(e);
+
+        if (handManager && cameFromHand)
+            handManager.SetHandHover(false);
     }
 
     public void OnDrag(PointerEventData e)
     {
-        if (!canDrag || returning) return;
+        if (HandBlocked || !CanDrag()) return;
+        if (!CanDrag()) return;
         MoveToPointerCenter(e);
     }
 
     public void OnEndDrag(PointerEventData e)
     {
-        if (!canDrag || returning) return;
+        if (HandBlocked || !CanDrag()) return;
+        if (!CanDrag()) return;
 
-        if (cardGrid != null &&
-            cardGrid.TrySnapFromDraggable(rt, reparentOnSnap, out var snappedParent, out var snappedLocal))
-        {
-            OnSnappedToSlot(snappedParent, snappedLocal);
-            return;
-        }
+        if (handManager && cameFromHand)
+            handManager.SetHandHover(true);
 
-        OnDropMissed();
+        CompleteInteraction();
+
+        if (handManager) StartCoroutine(DelayedHoverRefresh());
+    }
+
+
+    private IEnumerator DelayedHoverRefresh()
+    {
+        yield return null; // let detach/reparent finish
+        handManager.RefreshHoverFromPointer(rt);
     }
 
     public void OnPointerUp(PointerEventData e)
     {
-        if (returning) return;        // ignore ups during return
-        if (!pointerActive) return;   // debounce: ignore stray ups
+        if (!pointerActive) return;
+        if (HandBlocked) { pointerActive = false; return; }
         pointerActive = false;
 
-        if (lightIsDown)
-        {
-            dragEnded?.Invoke();
-            lightIsDown = false;
-        }
+        dragEnded?.Invoke();
 
-        if (cardGrid) cardGrid.SetDrag(null, false);
-        if (returning) return;
+        if (state == DragState.ReturningToHand || state == DragState.ReturningToSlot) return;
+        CompleteInteraction();
+
+        if (handManager) handManager.RefreshHoverFromPointer();
+    }
+
+    private bool CanDrag() =>
+        state != DragState.ReturningToHand && state != DragState.ReturningToSlot;
+
+    private void CompleteInteraction()
+    {
+        cardGrid?.SetDrag(null, false);
 
         if (cardGrid != null &&
-            cardGrid.TrySnapFromDraggable(rt, reparentOnSnap, out var snappedParent, out var snappedLocal))
+            cardGrid.TrySnapFromDraggable(rt, /* reparentOnSnap from grid not needed */ false,
+                out var snappedParent, out var snappedLocal))
         {
             OnSnappedToSlot(snappedParent, snappedLocal);
             return;
@@ -184,132 +226,131 @@ public class UIDraggable : MonoBehaviour,
         OnDropMissed();
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Core behaviors
-    // ─────────────────────────────────────────────────────────────
     private void OnSnappedToSlot(RectTransform snappedParent, Vector2 snappedLocal)
     {
-        if (cameFromHand && handManager != null)
-            handManager.DetachCard(rt);
+        if (cameFromHand && handManager) handManager.DetachCard(rt);
 
-        lastSlotParent = snappedParent;
-        lastSlotLocal = snappedLocal;
+        // If the pointer is still over this card as it moves to Field,
+        // ensure it no longer counts toward hand hover.
+        if (countsForHandHover && handManager && !IsInHand)
+        {
+            countsForHandHover = false;
+            handManager.CardHoverExit(rt);
+        }
+
+        // kill any grid snap tween that might have been started
+        DOTween.Kill(GRID_POS_ID);
+
+        // convert snapped point (in snappedParent local) -> world -> field local
+        Vector3 targetWorld = snappedParent.TransformPoint(new Vector3(snappedLocal.x, snappedLocal.y, 0f));
+
+        if (reparentOnSnap && fieldParent != null)
+        {
+            var fieldRT = (RectTransform)fieldParent;
+
+            // reparent to field, preserving current world pos first
+            rt.SetParent(fieldParent, worldPositionStays: true);
+
+            // compute local point in field space and animate there
+            Vector3 localInField = fieldRT.InverseTransformPoint(targetWorld);
+
+            SetScaleAbs(slotScale, 0f); // keep ABSOLUTE slot scale on field
+            DOTween.Kill(POS_ID);
+            rt.DOAnchorPos3D(localInField, missReturnDuration)
+              .SetEase(missReturnEase)
+              .SetId(POS_ID);
+
+            lastSlotParent = fieldRT;
+            lastSlotLocal = localInField;
+        }
+        else
+        {
+            // default: stay under the grid's parent
+            if (rt.parent != snappedParent)
+                rt.SetParent(snappedParent, worldPositionStays: true);
+
+            SetScaleAbs(slotScale, 0f);
+            DOTween.Kill(POS_ID);
+            rt.DOAnchorPos(snappedLocal, missReturnDuration)
+              .SetEase(missReturnEase)
+              .SetId(POS_ID);
+
+            lastSlotParent = snappedParent;
+            lastSlotLocal = snappedLocal;
+        }
+
         isInSlot = true;
-
-        // Keep ABSOLUTE slot scale (1.1)
         FinishDragVisuals(stayScaled: true);
+        state = DragState.Snapped;
     }
 
     private void OnDropMissed()
     {
-        // Robust decision: if the hand owns this card (now or originally), go back to hand
-        bool shouldReturnToHand = handManager != null && (cameFromHand || handManager.Contains(rt));
+        bool shouldReturnToHand = handManager && (cameFromHand || handManager.Contains(rt));
 
-        if (shouldReturnToHand)
-        {
-            ReturnToHand();
-        }
-        else if (isInSlot && lastSlotParent != null)
-        {
-            ReturnToLastSlot();
-        }
-        else
-        {
-            FinishDragVisuals(stayScaled: false);
-        }
+        if (shouldReturnToHand) ReturnToHand();
+        else if (isInSlot && lastSlotParent) ReturnToLastSlot();
+        else FinishDragVisuals(stayScaled: false);
     }
 
     private void ReturnToHand()
     {
-        returning = true;
-        canDrag = false;
+        state = DragState.ReturningToHand;
 
-        KillMoveOnly();
-
-        // allow hand to control position/rotation, but we restore scale now
+        DOTween.Kill(POS_ID);
         SetScaleOriginal(dragScaleDuration);
-
-        // IMPORTANT: let the hand layout move this card again before requesting return
-        if (handManager != null)
-            handManager.SetDragging(rt, false);
+        if (handManager) handManager.SetDragging(rt, false);
 
         handManager.ReturnCardToHand(rt, onLaidOut: () =>
         {
-            returning = false;
-            canDrag = true;
             isInSlot = false;
             FinishDragVisuals(stayScaled: false);
+            state = DragState.Idle;
         });
     }
 
     private void ReturnToLastSlot()
     {
-        returning = true;
-        canDrag = false;
+        state = DragState.ReturningToSlot;
 
-        KillMoveOnly();
+        DOTween.Kill(POS_ID);
 
         if (rt.parent != lastSlotParent)
             rt.SetParent(lastSlotParent, worldPositionStays: true);
 
-        // ensure ABSOLUTE slot scale in slot
         SetScaleAbs(slotScale, 0f);
 
-        moveTween = rt
-            .DOAnchorPos(lastSlotLocal, missReturnDuration)
-            .SetEase(missReturnEase)
-            .OnComplete(() =>
-            {
-                returning = false;
-                canDrag = true;
-                isInSlot = true;
-                FinishDragVisuals(stayScaled: true); // remain 1.1 in slot
-            });
+        rt.DOAnchorPos(lastSlotLocal, missReturnDuration)
+          .SetEase(missReturnEase)
+          .SetId(POS_ID)
+          .OnComplete(() =>
+          {
+              isInSlot = true;
+              FinishDragVisuals(stayScaled: true);
+              state = DragState.Snapped;
+          });
     }
 
     private void FinishDragVisuals(bool stayScaled)
     {
         if (!stayScaled) SetScaleOriginal(dragScaleDuration);
-
-        if (handManager != null)
-            handManager.SetDragging(rt, false);
+        if (handManager) handManager.SetDragging(rt, false);
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Scale utilities (race-safe)
-    // ─────────────────────────────────────────────────────────────
     private void SetScaleAbs(float target, float duration)
     {
-        // kill only the previous scale tween; leave move tween alone
-        if (scaleTween != null && scaleTween.IsActive()) scaleTween.Kill();
-        // absolute uniform target
-        scaleTween = rt.DOScale(new Vector3(target, target, target), duration).SetUpdate(true);
+        DOTween.Kill(SCALE_ID);
+        rt.DOScale(new Vector3(target, target, target), duration)
+          .SetUpdate(true)
+          .SetId(SCALE_ID);
     }
 
     private void SetScaleOriginal(float duration)
     {
-        if (scaleTween != null && scaleTween.IsActive()) scaleTween.Kill();
-        scaleTween = rt.DOScale(originalScale, duration).SetUpdate(true);
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // Motion utilities
-    // ─────────────────────────────────────────────────────────────
-    private void KillMoveOnly()
-    {
-        if (moveTween != null && moveTween.IsActive()) moveTween.Kill();
-        // Intentionally do NOT call DOTween.Kill(rt) here; that would also kill the scale tween.
-    }
-
-    private void ResetStateAndKillAllTweens()
-    {
-        returning = false;
-        canDrag = true;
-
-        if (moveTween != null && moveTween.IsActive()) moveTween.Kill();
-        if (scaleTween != null && scaleTween.IsActive()) scaleTween.Kill();
-
-        DOTween.Kill(rt); // final cleanup (only on disable)
+        DOTween.Kill(SCALE_ID);
+        rt.DOScale(originalScale, duration)
+          .SetUpdate(true)
+          .SetId(SCALE_ID);
     }
 
     private void MoveToPointerCenter(PointerEventData e)
@@ -327,20 +368,24 @@ public class UIDraggable : MonoBehaviour,
     private void OnDisable()
     {
         pointerActive = false;
+        dragEnded?.Invoke();
+        cardGrid?.SetDrag(null, false);
 
-        if (lightIsDown)
+        DOTween.Kill(POS_ID);
+        DOTween.Kill(SCALE_ID);
+        DOTween.Kill(HAND_LAYOUT_ID);
+        DOTween.Kill(GRID_POS_ID);
+
+        state = DragState.Idle;
+
+        if (countsForHandHover && handManager)
         {
-            dragEnded?.Invoke();
-            lightIsDown = false;
+            countsForHandHover = false;
+            handManager.CardHoverExit(rt);
         }
-        if (cardGrid) cardGrid.SetDrag(null, false);
-
-        ResetStateAndKillAllTweens();
+        isPointerOver = false;
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Optional: pre-seed slot state for cards that start in a slot
-    // ─────────────────────────────────────────────────────────────
     public void InitializeAsInSlot(RectTransform slotParent, Vector2 localInParent, bool setScaleToSlot = true)
     {
         lastSlotParent = slotParent;
@@ -352,5 +397,8 @@ public class UIDraggable : MonoBehaviour,
 
         rt.anchoredPosition = localInParent;
         if (setScaleToSlot) rt.localScale = new Vector3(slotScale, slotScale, slotScale);
+        state = DragState.Snapped;
     }
+
+
 }
