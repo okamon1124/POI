@@ -19,9 +19,6 @@ public class UiCard : MonoBehaviour,
     private Tween scaleTween;
     private Tween moveTween;
 
-    private Vector2 _initialAnchoredPos;
-    private Vector3 _initialWorldPivotPos;
-
     private bool isPointerOver;
 
     [Header("Hover Settings")]
@@ -34,13 +31,20 @@ public class UiCard : MonoBehaviour,
     [SerializeField] private CardData cardData;
     public CardData CardData => cardData;
 
-
-    //public Transform currentSlotTransform;
+    public Team OwnerTeam = Team.Both;
 
     [SerializeField] private Zone currentZone;
     public Zone CurrentZone => currentZone;
 
-    private Zone initialZone;
+    [Header("Visuals")]
+    [SerializeField] private RectTransform visual;
+
+    [Header("Zone Scales")]
+    [SerializeField] private float handBaseScale = 1.4f;     // bigger when in hand
+    [SerializeField] private float cellBaseScale = 1.1f;     // normal board/cell scale
+    [SerializeField] private float draggingScale = 1.1f;     // scale while dragging
+
+    [SerializeField] private float liftAmount = 30f;
 
     [SerializeField] private bool stateChangeDebuger = false;
 
@@ -52,7 +56,8 @@ public class UiCard : MonoBehaviour,
         PointerDown = 3,
         BeginDrag = 4,
         EndDrag = 5,
-        ReturnedToSlot = 6,
+        ReturnedToCell = 6,
+        ReturnedToHand = 7,
     }
 
     private void Awake()
@@ -61,15 +66,10 @@ public class UiCard : MonoBehaviour,
         canvas = GetComponentInParent<Canvas>();
         canvasGroup = GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
 
-        if (currentZone == null)
+        if (currentZone != null)
         {
-            Debug.LogError("Please ensure this card has currentZone, you need to drag it in SerializeField for testing");
-            return;
+            currentZone.TryAdd(this);
         }
-
-        initialZone = currentZone;
-
-        currentZone.TryAdd(this);
 
         if (canvas && canvas.renderMode == RenderMode.WorldSpace && canvas.worldCamera == null)
         {
@@ -80,23 +80,31 @@ public class UiCard : MonoBehaviour,
     private void Start()
     {
         initialScale = rectTransform.localScale;
-        _initialAnchoredPos = rectTransform.anchoredPosition;
-        _initialWorldPivotPos = rectTransform.position;
 
         stateMachine = new StateMachine<UiCard>(this);
 
-        stateMachine.AddTransition<StateInSlotIdle, StateInSlotHovering>((int)Event.PointerEnter);
-        stateMachine.AddTransition<StateInSlotHovering, StateInSlotIdle>((int)Event.PointerExit);
-        stateMachine.AddTransition<StateInSlotHovering, StateInSlotPressed>((int)Event.PointerDown);
-        stateMachine.AddTransition<StateInSlotPressed, StateMovingToZone>((int)Event.PointerUp);
+        // ---- CELL branch ----
+        stateMachine.AddTransition<StateInCellIdle, StateInCellHovering>((int)Event.PointerEnter);
+        stateMachine.AddTransition<StateInCellHovering, StateInCellIdle>((int)Event.PointerExit);
+        stateMachine.AddTransition<StateInCellHovering, StateInCellPressed>((int)Event.PointerDown);
+        stateMachine.AddTransition<StateInCellPressed, StateMovingToZone>((int)Event.PointerUp);
+        stateMachine.AddTransition<StateInCellPressed, StateDraggingFromCell>((int)Event.BeginDrag);
+        stateMachine.AddTransition<StateDraggingFromCell, StateMovingToZone>((int)Event.EndDrag);
 
-        stateMachine.AddTransition<StateInSlotPressed, StateDraggingFromSlot>((int)Event.BeginDrag);
-        stateMachine.AddTransition<StateDraggingFromSlot, StateMovingToZone>((int)Event.EndDrag);
+        // Return target depends on where the card currently lives
+        stateMachine.AddTransition<StateMovingToZone, StateInCellIdle>((int)Event.ReturnedToCell);
+        stateMachine.AddTransition<StateMovingToZone, StateInHandIdle>((int)Event.ReturnedToHand);
 
-        stateMachine.AddTransition<StateMovingToZone, StateInSlotIdle>((int)Event.ReturnedToSlot);
+        // ---- HAND branch ----
+        stateMachine.AddTransition<StateInHandIdle, StateInHandHover>((int)Event.PointerEnter);
+        stateMachine.AddTransition<StateInHandHover, StateInHandIdle>((int)Event.PointerExit);
+        stateMachine.AddTransition<StateInHandHover, StateInCellPressed>((int)Event.PointerDown);
 
 
-        stateMachine.Start<StateInSlotIdle>();
+        if (currentZone.zoneType == ZoneType.Hand)
+            stateMachine.Start<StateInHandIdle>();
+        else
+            stateMachine.Start<StateInCellIdle>();
 
         stateMachine.OnStateChanged += (from, to, evt) =>
         {
@@ -110,6 +118,8 @@ public class UiCard : MonoBehaviour,
                 $"--(<color=orange>{evtName}</color>)--> <color=yellow>{toName}</color>");
             }
         };
+
+        ApplyZoneScale();
     }
 
     private void Update()
@@ -119,18 +129,40 @@ public class UiCard : MonoBehaviour,
 
     public void OnPointerEnter(PointerEventData e)
     {
-        //Debug.Log("Enter");
+        EventBus.Publish(new CardHoverEnterEvent(this));
         isPointerOver = true;
-        stateMachine.Dispatch((int)Event.PointerEnter);
+
+        if (PlayerControlState.I.IsAnotherCardBeingDragged(this))
+        {
+            Debug.Log("Don't scale up because another card is dragging");
+        }
+        else
+        {
+            stateMachine.Dispatch((int)Event.PointerEnter);
+        }
     }
     public void OnPointerExit(PointerEventData e)
     {
-        //Debug.Log("Exit");
+        EventBus.Publish(new CardHoverExitEvent(this));
         isPointerOver = false;
         stateMachine.Dispatch((int)Event.PointerExit);
     }
     public void OnPointerDown(PointerEventData e)
     {
+        //var zm = ZoneManager.I;
+        //var cz = CurrentZone;
+        //var czName = cz ? cz.zoneType.ToString() : "NULL";
+        //
+        //List<Zone> valids = zm ? zm.GetValidDestinations(this) : null;
+        //int zonesCount = zm?.Zones?.Count ?? -1;
+        //int validCount = valids?.Count ?? -1;
+        //
+        //Debug.Log($"[Probe] {name} click | CurrentZone={czName} | Zones={zonesCount} | Valid={validCount}");
+        //
+        //if (valids != null)
+        //    foreach (var z in valids)
+        //        Debug.Log($"[Probe] -> {z.zoneType} (full={z.IsFull})");
+
         if (!ZoneManager.I.HasValidDestination(this))
         {
             Debug.Log($"{name}: click disabled (no valid move).");
@@ -151,7 +183,7 @@ public class UiCard : MonoBehaviour,
     }
     public void OnBeginDrag(PointerEventData e)
     {
-        //Debug.Log("BeginDrag");
+        EventBus.Publish(new CardDragBeginEvent(this));
         stateMachine.Dispatch((int)Event.BeginDrag);
     }
     public void OnDrag(PointerEventData e)
@@ -160,11 +192,11 @@ public class UiCard : MonoBehaviour,
     }
     public void OnEndDrag(PointerEventData e)
     {
-        //Debug.Log("EndDrag");
+        EventBus.Publish(new CardDragEndEvent(this));
         stateMachine.Dispatch((int)Event.EndDrag);
     }
 
-    private class StateInSlotIdle : State
+    private class StateInCellIdle : State
     {
         protected override void OnEnter(State prevState)
         {
@@ -173,7 +205,7 @@ public class UiCard : MonoBehaviour,
         }
     }
 
-    private class StateInSlotHovering : State
+    private class StateInCellHovering : State
     {
         protected override void OnEnter(State prevState)
         {
@@ -182,7 +214,7 @@ public class UiCard : MonoBehaviour,
         }
     }
 
-    private class StateInSlotPressed : State //Pressed but not drgging
+    private class StateInCellPressed : State //Pressed but not drgging
     {
         protected override void OnEnter(State prevState)
         {
@@ -196,21 +228,31 @@ public class UiCard : MonoBehaviour,
         }
     }
 
-    private class StateDraggingFromSlot : State
+    private class StateDraggingFromCell : State
     {
+        private Vector3 _savedScale;
+
         protected override void OnEnter(State prevState)
         {
-            // Make sure drops can be detected under this card
             if (!Owner.canvasGroup)
                 Owner.canvasGroup = Owner.GetComponent<CanvasGroup>() ?? Owner.gameObject.AddComponent<CanvasGroup>();
 
-            Owner.canvasGroup.blocksRaycasts = false;   // allow drop targets to receive pointer
-            Owner.canvasGroup.interactable = false;   // optional: don't take clicks while dragging
-            Owner.rectTransform.SetAsLastSibling();     // render on top while dragging
+            Owner.canvasGroup.blocksRaycasts = false;
+            Owner.canvasGroup.interactable = false;
+            Owner.rectTransform.SetAsLastSibling();
 
-            // optional: add a subtle scale/alpha cue while dragging
-            // Owner.PlayScaleTween(Owner.initialScale * Owner.hoverScale);
-            // Owner.canvasGroup.alpha = 0.95f;
+            // flatten rotation if dragging from hand
+            if (Owner.currentZone && Owner.currentZone.zoneType == ZoneType.Hand)
+            {
+                DOTween.Kill(Owner.rectTransform);
+                Owner.rectTransform.rotation = Quaternion.identity;
+            }
+
+            // --- Apply drag scale ---
+            _savedScale = Owner.rectTransform.localScale;
+            Owner.rectTransform.DOScale(Vector3.one * Owner.draggingScale, Owner.tweenDuration * 0.5f)
+                .SetEase(Owner.ease)
+                .SetUpdate(Owner.ignoreTimeScale);
         }
 
         protected override void OnUpdate()
@@ -220,13 +262,15 @@ public class UiCard : MonoBehaviour,
 
         protected override void OnExit(State nextState)
         {
-            // Restore raycasts so the card can be clicked again
+            // restore raycast
             if (Owner.canvasGroup)
             {
                 Owner.canvasGroup.blocksRaycasts = true;
                 Owner.canvasGroup.interactable = true;
-                // Owner.canvasGroup.alpha = 1f; // if you changed it
             }
+
+            // --- Restore correct base scale for the destination zone ---
+            Owner.ApplyZoneScale();
         }
     }
 
@@ -235,11 +279,78 @@ public class UiCard : MonoBehaviour,
         protected override void OnEnter(State prevState)
         {
             // Animate the card returning to its slot (or initial position)
-            Owner.ReturnCenterToCell();
+            Owner.AnimateToCurrentZone();
         }
 
         protected override void OnUpdate() { }
     }
+
+    private class StateInHandIdle : State
+    {
+        protected override void OnEnter(State prevState)
+        {
+            Owner.PlayScaleTween(Owner.initialScale);
+        }
+    }
+
+    private class StateInHandHover : State
+    {
+        private int _savedSibling;
+        private Vector3 _baseLocalPos;     // the original resting position in layout
+        private bool _cachedBasePos = false;
+
+        protected override void OnEnter(State prevState)
+        {
+            Owner.PlayScaleTween(Owner.initialScale * Owner.hoverScale);
+
+            if (Owner.rectTransform)
+            {
+                _savedSibling = Owner.rectTransform.GetSiblingIndex();
+                Owner.rectTransform.SetAsLastSibling();
+            }
+
+            if (Owner.visual)
+            {
+                if (!_cachedBasePos)
+                {
+                    // remember the starting position only once
+                    _baseLocalPos = Owner.visual.localPosition;
+                    _cachedBasePos = true;
+                }
+
+                // move relative to base each time
+                Vector3 lifted = _baseLocalPos + new Vector3(0f, Owner.liftAmount, 0f);
+                Owner.visual.DOKill(false);
+                Owner.visual.DOLocalMove(lifted, Owner.tweenDuration)
+                    .SetEase(Owner.ease)
+                    .SetUpdate(Owner.ignoreTimeScale)
+                    .SetId("hover_vis_move");
+            }
+        }
+
+        protected override void OnExit(State nextState)
+        {
+            if (Owner.visual)
+            {
+                DOTween.Kill("hover_vis_move");
+
+                // Force reset position (guard against interrupted tween)
+                Owner.visual.localPosition = _baseLocalPos;
+
+                // Optional: smooth return if you want a visible motion
+                Owner.visual.DOLocalMove(_baseLocalPos, Owner.tweenDuration)
+                    .SetEase(Owner.ease)
+                    .SetUpdate(Owner.ignoreTimeScale)
+                    .SetId("hover_vis_move");
+            }
+
+            if (!(nextState is StateDraggingFromCell) && Owner.rectTransform)
+                Owner.rectTransform.SetSiblingIndex(_savedSibling);
+
+            Owner.PlayScaleTween(Owner.initialScale);
+        }
+    }
+
 
     private void PlayScaleTween(Vector3 target)
     {
@@ -264,26 +375,37 @@ public class UiCard : MonoBehaviour,
         }
     }
 
-    private void ReturnCenterToCell()
+    public void AnimateToCurrentZone()
     {
-        // 1) Guard
         if (currentZone == null)
         {
             Debug.LogError("currentZone is null; cannot return.");
-            stateMachine.Dispatch((int)Event.ReturnedToSlot);
+            stateMachine.Dispatch((int)Event.ReturnedToCell);
             return;
         }
 
-        // 2) Compute card pivot¡÷center offset (local)
+        if (currentZone.zoneType == ZoneType.Hand)
+        {
+            var layout = currentZone.GetComponent<HandSplineLayout>();
+            if (layout)
+            {
+                layout.Reflow();
+
+                // Defer the state machine event so it's not fired inside OnEnter.
+                DOVirtual.DelayedCall(0f, NotifyReturnedAndRehover)
+                    .SetUpdate(ignoreTimeScale); // keep consistent with your tweens
+                return;
+            }
+        }
+
+        // Default behavior (non-hand zones): tween pivot to zone center
         Vector2 size = rectTransform.rect.size;
         Vector2 localCenter2D = (new Vector2(0.5f, 0.5f) - rectTransform.pivot) * size;
         Vector3 localCenter = new Vector3(localCenter2D.x, localCenter2D.y, 0f);
 
-        // 3) Zone center (world) via RectTransform
         var zoneRt = currentZone.GetComponent<RectTransform>();
         Vector3 zoneCenterWorld = zoneRt.TransformPoint(zoneRt.rect.center);
 
-        // 4) Convert offset to world and move
         Vector3 worldOffset = rectTransform.TransformVector(localCenter);
         Vector3 targetPivotWorld = zoneCenterWorld - worldOffset;
 
@@ -295,13 +417,15 @@ public class UiCard : MonoBehaviour,
             .OnComplete(NotifyReturnedAndRehover);
     }
 
-    // Helper used by ReturnCenterToSlot()
     private void NotifyReturnedAndRehover()
     {
-        // 1) Tell the FSM we've finished returning
-        stateMachine.Dispatch((int)Event.ReturnedToSlot);
+        // choose destination idle based on current zone
+        if (currentZone != null && currentZone.zoneType == ZoneType.Hand)
+            stateMachine.Dispatch((int)Event.ReturnedToHand);
+        else
+            stateMachine.Dispatch((int)Event.ReturnedToCell);
 
-        // 2) Restore correct hover state based on pointer
+        // re-apply hover if pointer is still over
         if (isPointerOver)
             stateMachine.Dispatch((int)Event.PointerEnter);
         else
@@ -326,15 +450,22 @@ public class UiCard : MonoBehaviour,
         return rectTransform.position;
     }
 
-    public void AssignZone(Zone newZone)
+    public void AssignZone(Zone z)
     {
-        currentZone = newZone;
+        currentZone = z;
+        ApplyZoneScale();
     }
 
-    public void AnimateToCurrentZone()
+    private void ApplyZoneScale()
     {
-        // Reuse your existing state path to play the tween
-        Debug.Log("AnimateToCurrentZone");
-        ReturnCenterToCell();
+        if (!rectTransform) return;
+
+        float target =
+            currentZone && currentZone.zoneType == ZoneType.Hand
+            ? handBaseScale
+            : cellBaseScale;
+
+        rectTransform.localScale = Vector3.one * target;
+        initialScale = rectTransform.localScale;   // update for hover baseline
     }
 }

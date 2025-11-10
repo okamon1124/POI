@@ -14,7 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   cardName: BlackRabit
   cardType: 0
-  manaCost: 3
-  attack: 2
+  manaCost: 2
+  attack: 1
   health: 4
   speed: 2
+  playerMoveRules:
+  - {fileID: 11400000, guid: 0774f56c5dfa40a42b9c685ed5377eac, type: 2}
+  - {fileID: 11400000, guid: 6d7e0185ac6b80d4f9736964e442dc8e, type: 2}
+  - {fileID: 11400000, guid: 0b9ada9c97f0f3d4ca01ef62bb52bbc3, type: 2}

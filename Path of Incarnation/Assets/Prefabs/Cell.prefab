@@ -166,7 +166,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Cell
   IsEnemy: 0
-  Occupant: {fileID: 0}
+  occupants: []
+  capacity: 99
+  highlightLight: {fileID: 3597913480802521802}
+  offIntensity: 0
+  availableIntensity: 2
+  hotIntensity: 5
+  fadeDuration: 0.25
+  ease: 6
+  nextZone: {fileID: 0}
+  zoneType: 0
 --- !u!1 &7543028307689210305
 GameObject:
   m_ObjectHideFlags: 0

@@ -29,18 +29,24 @@ public class ZoneManager : Singleton<ZoneManager>
         return list;
     }
 
-    // Gate starting a player drag/click (uses MoveRules)
     public bool HasValidDestination(UiCard card)
     {
-        if (card == null || card.CurrentZone == null) return false;
+        if (card == null || card.CurrentZone == null)
+            return false;
 
-        foreach (var z in zones)
+        var from = card.CurrentZone;
+
+        // Loop through all zones and use MoveRules to check if this card can move there.
+        foreach (var to in zones)
         {
-            if (z == card.CurrentZone) continue;
-            if (z.IsFull) continue;
-            if (MoveRules.CanMoveZoneToZone(card, card.CurrentZone, z, MoveType.Player, out _))
+            if (to == from) continue;      // skip same zone
+            if (to.IsFull) continue;       // skip full destinations
+
+            // Ask MoveRules if this player move is allowed.
+            if (MoveRules.CanMoveZoneToZone(card, from, to, MoveType.Player, out _))
                 return true;
         }
+
         return false;
     }
 
@@ -142,14 +148,6 @@ public class ZoneManager : Singleton<ZoneManager>
             }
         }
         return moved;
-    }
-
-    private void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            AdvanceEndTurn();
-        }
     }
 
     [Button]

@@ -7,8 +7,7 @@ public class CardData : ScriptableObject
 {
     public string cardName;
     public CardType cardType;
-    public int manaCost;
-    public int attack;
-    public int health;
-    public int speed;
+    public int manaCost, attack, health, speed;
+
+    public PlayRule[] playerMoveRules;
 }
