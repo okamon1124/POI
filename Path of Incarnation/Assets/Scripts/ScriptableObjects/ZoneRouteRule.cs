@@ -5,21 +5,24 @@ public class ZoneRouteRule : PlayRule
 {
     [SerializeField] private ZoneType fromType;
     [SerializeField] private ZoneType toType;
-    [SerializeField] private Team allowedSide = Team.Ally; // Ally, Enemy, Both
 
-    public override RuleResult Evaluate(UiCard card, Zone from, Zone to, MoveType moveType, out string reason)
+    public override RuleResult Evaluate(
+        CardData cardData,
+        ZoneType fromZone,
+        ZoneType toZone,
+        MoveType moveType,
+        out string reason
+    )
     {
-        if (from.zoneType != fromType || to.zoneType != toType) { reason = null; return RuleResult.Ignore; }
+        // Rule only matches if both zone types match what we expect
+        if (fromZone != fromType || toZone != toType)
+        {
+            reason = null;
+            return RuleResult.Ignore;
+        }
 
-        if (allowedSide == Team.Both) { reason = null; return RuleResult.Allow; }
-
-        bool isAllyTarget = (card.OwnerTeam == to.OwnerTeam);
-        bool ok = (allowedSide == Team.Ally && isAllyTarget) ||
-                  (allowedSide == Team.Enemy && !isAllyTarget);
-
-        if (ok) { reason = null; return RuleResult.Allow; }
-
-        reason = "Wrong side for this move.";
-        return RuleResult.Deny;
+        // Route matches → allow
+        reason = null;
+        return RuleResult.Allow;
     }
 }
