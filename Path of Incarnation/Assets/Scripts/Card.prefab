@@ -200,7 +200,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8200101765487469941}
-  - component: {fileID: 3451999327641173266}
   m_Layer: 5
   m_Name: Visual
   m_TagString: Untagged
@@ -235,28 +234,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!95 &3451999327641173266
-Animator:
-  serializedVersion: 7
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 618884420913786007}
-  m_Enabled: 1
-  m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: b0afd95d13e6c0642ba0d17e0e9f57cb, type: 2}
-  m_CullingMode: 0
-  m_UpdateMode: 0
-  m_ApplyRootMotion: 0
-  m_LinearVelocityBlending: 0
-  m_StabilizeFeet: 0
-  m_AnimatePhysics: 0
-  m_WarningMessage: 
-  m_HasTransformHierarchy: 1
-  m_AllowConstantClipSamplingOptimization: 1
-  m_KeepAnimatorStateOnDisable: 0
-  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &1479204890637780548
 GameObject:
   m_ObjectHideFlags: 0
@@ -2141,6 +2118,7 @@ GameObject:
   - component: {fileID: 833012129588823219}
   - component: {fileID: 2066050003086391146}
   - component: {fileID: 8824554661999202324}
+  - component: {fileID: 8866773633711181071}
   m_Layer: 5
   m_Name: Card
   m_TagString: Untagged
@@ -2189,27 +2167,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c52e4ca353cc80a42b6e2d0f83193470, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UiCard
-  hoverScale: 1.3
-  tweenDuration: 0.2
-  ease: 6
-  ignoreTimeScale: 0
+  visuals: {fileID: 8866773633711181071}
+  config: {fileID: 11400000, guid: 75d450a356fd4d94ba2e8eda615d2a5f, type: 2}
   uiRegistry: {fileID: 0}
-  visual: {fileID: 8200101765487469941}
-  artImage: {fileID: 8101027129915099047}
-  nameText: {fileID: 3212795788852649795}
-  costText: {fileID: 5768197862191702169}
-  powerText: {fileID: 3538547279529611258}
-  healthText: {fileID: 538472305721391730}
-  speedText: {fileID: 8233789933081547954}
-  handBaseScale: 1.4
-  cellBaseScale: 1.1
-  draggingScale: 0.95
-  liftAmount: 30
-  stateChangeDebuger: 0
-  availabilityLight: {fileID: 6693646418687432024}
-  availableLightIntensity: 5
-  unavailableLightIntensity: 0
-  enemyLight: {fileID: 4292936005437971460}
+  stateChangeDebugger: 0
 --- !u!225 &8824554661999202324
 CanvasGroup:
   m_ObjectHideFlags: 0
@@ -2222,6 +2183,27 @@ CanvasGroup:
   m_Interactable: 1
   m_BlocksRaycasts: 1
   m_IgnoreParentGroups: 0
+--- !u!114 &8866773633711181071
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4855961407611091743}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9a93f7a98de0d484bbfdd38af18fbf92, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UiCardVisuals
+  artImage: {fileID: 8101027129915099047}
+  nameText: {fileID: 3212795788852649795}
+  costText: {fileID: 5768197862191702169}
+  powerText: {fileID: 3538547279529611258}
+  healthText: {fileID: 538472305721391730}
+  speedText: {fileID: 8233789933081547954}
+  availabilityLight: {fileID: 6693646418687432024}
+  enemyLight: {fileID: 4292936005437971460}
+  visual: {fileID: 8200101765487469941}
 --- !u!1 &5281735442089595239
 GameObject:
   m_ObjectHideFlags: 0

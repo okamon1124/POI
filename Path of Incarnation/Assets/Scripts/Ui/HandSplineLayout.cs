@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.Splines;
 using DG.Tweening;
 using System.Collections.Generic;
+using System.Linq;
 
 [RequireComponent(typeof(RectTransform))]
 public class HandSplineLayout : MonoBehaviour
@@ -33,6 +34,17 @@ public class HandSplineLayout : MonoBehaviour
     [SerializeField]
     private bool autoShrinkToFit = true;
 
+    private List<UiCard> logicalOrder = new List<UiCard>();
+
+    public enum ZOrderResetMode
+    {
+        ResetToSideOrder,   // Option 1: Reset to left-to-right order
+        KeepLastOrder       // Option 2: Keep pyramid order from last hover
+    }
+
+    [Header("Z-Order")]
+    [SerializeField] private ZOrderResetMode zOrderResetMode = ZOrderResetMode.KeepLastOrder;
+
     private void Awake()
     {
         if (!cardsRoot)
@@ -44,17 +56,21 @@ public class HandSplineLayout : MonoBehaviour
     {
         if (!cardsRoot || !spline) return;
 
-        // collect active UiCards under cardsRoot
-        var cards = new List<UiCard>();
+        // Auto-refresh logical order if empty or count mismatch
+        int actualChildCount = 0;
         foreach (Transform child in cardsRoot)
         {
-            var uiCard = child.GetComponent<UiCard>();
-            if (uiCard != null)
-                cards.Add(uiCard);
+            if (child.GetComponent<UiCard>() != null)
+                actualChildCount++;
         }
 
-        int n = cards.Count;
+        if (logicalOrder.Count != actualChildCount)
+            RefreshLogicalOrder();
+
+        int n = logicalOrder.Count;
         if (n == 0) return;
+
+        // ... rest of Reflow uses logicalOrder instead of sibling indices ...
 
         // Clamp and normalize range
         float a = Mathf.Clamp01(tStart);
@@ -90,16 +106,14 @@ public class HandSplineLayout : MonoBehaviour
 
         for (int i = 0; i < n; i++)
         {
-            var card = cards[i];
+            var card = logicalOrder[i];
             if (!card) continue;
-
-            // keep consistent visual order (0..n-1)
-            card.transform.SetSiblingIndex(i);
 
             int j = (direction == Direction.RightToLeft) ? (n - 1 - i) : i;
             float t = (n == 1) ? start : (start + step * j);
 
             Vector3 pos = spline.EvaluatePosition(t);
+            Vector3 posWorld = spline.transform.TransformPoint(pos);
             Quaternion rot = Quaternion.identity;
 
             if (rotateWithSpline)
@@ -112,16 +126,114 @@ public class HandSplineLayout : MonoBehaviour
             var rt = card.GetComponent<RectTransform>();
             if (!rt) continue;
 
-            // pivot correction so the visual center follows the spline, not the pivot
             Vector2 size = rt.rect.size;
             Vector2 localCenter2D = (new Vector2(0.5f, 0.5f) - rt.pivot) * size;
             Vector3 worldOffset = rt.TransformVector(new Vector3(localCenter2D.x, localCenter2D.y, 0f));
-            Vector3 targetPivotWorld = pos - worldOffset;
+            Vector3 targetPivotWorld = posWorld - worldOffset;
 
             rt.DOKill(true);
             rt.DOMove(targetPivotWorld, duration).SetEase(ease);
             if (rotateWithSpline)
                 rt.DORotateQuaternion(rot, duration).SetEase(ease);
         }
+    }
+
+    /// <summary>
+    /// Force reset sibling order to match left-to-right positional order.
+    /// Call this when you need to normalize Z-order (e.g., after all hovers end).
+    /// </summary>
+    [ContextMenu("Reset Sibling Order")]
+    public void ResetSiblingOrder()
+    {
+        if (!cardsRoot) return;
+
+        var cards = new List<UiCard>();
+        foreach (Transform child in cardsRoot)
+        {
+            var uiCard = child.GetComponent<UiCard>();
+            if (uiCard != null)
+                cards.Add(uiCard);
+        }
+
+        // Sort by current sibling index, then set them sequentially
+        cards = cards.OrderBy(c => c.transform.GetSiblingIndex()).ToList();
+
+        for (int i = 0; i < cards.Count; i++)
+        {
+            cards[i].transform.SetSiblingIndex(i);
+        }
+    }
+
+    public void RefreshLogicalOrder()
+    {
+        logicalOrder.Clear();
+        foreach (Transform child in cardsRoot)
+        {
+            var uiCard = child.GetComponent<UiCard>();
+            if (uiCard != null)
+                logicalOrder.Add(uiCard);
+        }
+    }
+
+    /// <summary>
+    /// Apply pyramid z-order centered on the hovered card.
+    /// Call with null to reset based on zOrderResetMode.
+    /// </summary>
+    public void ApplyPyramidZOrder(UiCard hoveredCard)
+    {
+        if (!cardsRoot) return;
+
+        // Ensure we have logical order
+        int actualChildCount = 0;
+        foreach (Transform child in cardsRoot)
+        {
+            if (child.GetComponent<UiCard>() != null)
+                actualChildCount++;
+        }
+
+        if (logicalOrder.Count != actualChildCount)
+            RefreshLogicalOrder();
+
+        if (hoveredCard == null)
+        {
+            // Reset based on mode
+            if (zOrderResetMode == ZOrderResetMode.ResetToSideOrder)
+            {
+                for (int i = 0; i < logicalOrder.Count; i++)
+                {
+                    if (logicalOrder[i] != null)
+                        logicalOrder[i].transform.SetSiblingIndex(i);
+                }
+            }
+            // KeepLastOrder: do nothing, keep current sibling order
+            return;
+        }
+
+        // Find hovered card's logical index
+        int hoveredLogicalIndex = logicalOrder.IndexOf(hoveredCard);
+        if (hoveredLogicalIndex < 0) return;
+
+        // Create list sorted by distance from hovered (furthest first = behind)
+        var sorted = logicalOrder
+            .Select((card, index) => (card, distance: Mathf.Abs(index - hoveredLogicalIndex)))
+            .OrderByDescending(x => x.distance)
+            .ThenBy(x => logicalOrder.IndexOf(x.card))
+            .Select(x => x.card)
+            .ToList();
+
+        // Apply new sibling order
+        for (int i = 0; i < sorted.Count; i++)
+        {
+            if (sorted[i] != null)
+                sorted[i].transform.SetSiblingIndex(i);
+        }
+    }
+
+    /// <summary>
+    /// Call when cards are added or removed from hand.
+    /// </summary>
+    public void NotifyCardsChanged()
+    {
+        RefreshLogicalOrder();
     }
 }
