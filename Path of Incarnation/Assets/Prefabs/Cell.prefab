@@ -86,7 +86,7 @@ GameObject:
   - component: {fileID: 7837370914311282342}
   - component: {fileID: 2260653483481618402}
   - component: {fileID: 5827945622041838782}
-  - component: {fileID: 1164840545779355018}
+  - component: {fileID: 1678886353823571376}
   m_Layer: 5
   m_Name: Cell
   m_TagString: Untagged
@@ -153,7 +153,7 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &1164840545779355018
+--- !u!114 &1678886353823571376
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -162,20 +162,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 2330317967600752812}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ee653f5c90af2db4088a48e4baba82dd, type: 3}
+  m_Script: {fileID: 11500000, guid: 74c7040bf2efb71428608dee12962c48, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::UiZone
-  OwnerTeam: 0
-  occupants: []
-  capacity: 99
+  m_EditorClassIdentifier: Assembly-CSharp::UiSlot
   highlightLight: {fileID: 3597913480802521802}
   offIntensity: 0
-  availableIntensity: 2
-  hotIntensity: 5
+  availableIntensity: 1.2
+  hotIntensity: 2
   fadeDuration: 0.2
   ease: 6
-  nextZone: {fileID: 0}
-  zoneType: 0
 --- !u!1 &7543028307689210305
 GameObject:
   m_ObjectHideFlags: 0

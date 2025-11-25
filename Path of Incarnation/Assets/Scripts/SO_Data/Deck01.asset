@@ -9,10 +9,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3c200206283b9bd4b93c7ffc31d7411f, type: 3}
+  m_Script: {fileID: 11500000, guid: 4c670ab0dc4418443905e2ba6260b23e, type: 3}
   m_Name: Deck01
-  m_EditorClassIdentifier: Assembly-CSharp::DeckAsset
-  cards:
+  m_EditorClassIdentifier: Assembly-CSharp::DeckListData
+  entries:
   - card: {fileID: 11400000, guid: ee1188032cc148341aba4096fcb77ed1, type: 2}
     count: 3
   - card: {fileID: 11400000, guid: 95e7c5cc2b281e94094c7fc3e4bfcc94, type: 2}

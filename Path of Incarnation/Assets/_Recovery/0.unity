@@ -173,10 +173,10 @@ MonoBehaviour:
   tEnd: 0.9
   edgePaddingT: 0.02
   rotateWithSpline: 1
-  direction: 0
+  direction: 1
   duration: 0.25
   ease: 6
-  spacingT: 0.1
+  spacingT: 0.08
   autoShrinkToFit: 1
 --- !u!1 &168790995
 GameObject:
@@ -2045,8 +2045,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 95}
-  m_SizeDelta: {x: 300, y: 160}
+  m_AnchoredPosition: {x: 0, y: 100}
+  m_SizeDelta: {x: 275, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &800247012
 MonoBehaviour:
@@ -2564,7 +2564,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 75, y: 75}
+  m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1148690738
 MonoBehaviour:
@@ -5035,10 +5035,6 @@ PrefabInstance:
       propertyPath: OwnerTeam
       value: 2
       objectReference: {fileID: 0}
-    - target: {fileID: 1678886353823571376, guid: 7997b9a1ae670474a8cfe6e241fb2f70, type: 3}
-      propertyPath: NextUiSlot
-      value: 
-      objectReference: {fileID: 1783325043}
     - target: {fileID: 2330317967600752812, guid: 7997b9a1ae670474a8cfe6e241fb2f70, type: 3}
       propertyPath: m_Name
       value: Cell
@@ -5207,8 +5203,6 @@ GameObject:
   - component: {fileID: 1751556792}
   - component: {fileID: 1751556793}
   - component: {fileID: 1751556795}
-  - component: {fileID: 1751556796}
-  - component: {fileID: 1751556797}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -5331,11 +5325,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameInitializer
   uiRegistry: {fileID: 1751556794}
   cardDrawPresenter: {fileID: 1751556791}
-  boardCardSpawnPresenter: {fileID: 1751556796}
   cardAvailabilityPresenter: {fileID: 1751556790}
   slotHighlightPresenter: {fileID: 1751556787}
   cardMovementPresenter: {fileID: 1751556792}
-  combbatPresenter: {fileID: 1751556797}
   cardDropInputHandler: {fileID: 1751556793}
   boardZoneGroups:
   - {fileID: 1331925937}
@@ -5353,11 +5345,9 @@ MonoBehaviour:
   playerHandCapacity: 10
   createOpponentHand: 0
   opponentHandCapacity: 10
-  playerDeckData: {fileID: 11400000, guid: 5a1f4a6fda23bad4c84b029f19173622, type: 2}
+  playerDeckData: {fileID: 0}
+  opponentDeckData: {fileID: 0}
   debugCardData: {fileID: 11400000, guid: ee1188032cc148341aba4096fcb77ed1, type: 2}
-  debugRangedCardData: {fileID: 11400000, guid: 87408c2a2c19a4344921c3c03d80d9cf, type: 2}
-  debugPlayerStartingHealth: 20
-  debugEnemyStartingHealth: 20
 --- !u!114 &1751556790
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5436,32 +5426,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b6a64a3bb9ea80747a4c6f32c161d036, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerCardInputState
---- !u!114 &1751556796
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1751556780}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8b0aa948f81ccc64486c413bf0a74e30, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BoardCardSpawnPresenter
-  cardPrefab: {fileID: 2066050003086391146, guid: 46ce3bf72be637a408d6ec8d6e17ab9f, type: 3}
-  boardCardsRoot: {fileID: 1447624874}
---- !u!114 &1751556797
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1751556780}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 66043c8d2e468344cac017d613ce7e7d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CombatPresenter
 --- !u!1001 &1753324313
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5486,10 +5450,6 @@ PrefabInstance:
       propertyPath: OwnerTeam
       value: 2
       objectReference: {fileID: 0}
-    - target: {fileID: 1678886353823571376, guid: 7997b9a1ae670474a8cfe6e241fb2f70, type: 3}
-      propertyPath: NextUiSlot
-      value: 
-      objectReference: {fileID: 1774054840}
     - target: {fileID: 2330317967600752812, guid: 7997b9a1ae670474a8cfe6e241fb2f70, type: 3}
       propertyPath: m_Name
       value: Cell
@@ -5650,10 +5610,6 @@ PrefabInstance:
       propertyPath: OwnerTeam
       value: 2
       objectReference: {fileID: 0}
-    - target: {fileID: 1678886353823571376, guid: 7997b9a1ae670474a8cfe6e241fb2f70, type: 3}
-      propertyPath: NextUiSlot
-      value: 
-      objectReference: {fileID: 1728295525}
     - target: {fileID: 2330317967600752812, guid: 7997b9a1ae670474a8cfe6e241fb2f70, type: 3}
       propertyPath: m_Name
       value: Cell
@@ -5830,10 +5786,6 @@ PrefabInstance:
       propertyPath: OwnerTeam
       value: 2
       objectReference: {fileID: 0}
-    - target: {fileID: 1678886353823571376, guid: 7997b9a1ae670474a8cfe6e241fb2f70, type: 3}
-      propertyPath: NextUiSlot
-      value: 
-      objectReference: {fileID: 2092401746}
     - target: {fileID: 2330317967600752812, guid: 7997b9a1ae670474a8cfe6e241fb2f70, type: 3}
       propertyPath: m_Name
       value: Cell
@@ -6390,10 +6342,6 @@ PrefabInstance:
       propertyPath: OwnerTeam
       value: 2
       objectReference: {fileID: 0}
-    - target: {fileID: 1678886353823571376, guid: 7997b9a1ae670474a8cfe6e241fb2f70, type: 3}
-      propertyPath: NextUiSlot
-      value: 
-      objectReference: {fileID: 1753324315}
     - target: {fileID: 2330317967600752812, guid: 7997b9a1ae670474a8cfe6e241fb2f70, type: 3}
       propertyPath: m_Name
       value: Cell
@@ -7599,10 +7547,6 @@ PrefabInstance:
       propertyPath: OwnerTeam
       value: 2
       objectReference: {fileID: 0}
-    - target: {fileID: 1678886353823571376, guid: 7997b9a1ae670474a8cfe6e241fb2f70, type: 3}
-      propertyPath: NextUiSlot
-      value: 
-      objectReference: {fileID: 1863757366}
     - target: {fileID: 2330317967600752812, guid: 7997b9a1ae670474a8cfe6e241fb2f70, type: 3}
       propertyPath: m_Name
       value: Cell

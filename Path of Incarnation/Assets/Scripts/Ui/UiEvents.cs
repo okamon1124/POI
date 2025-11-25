@@ -16,15 +16,27 @@ public struct PlayerDragChangedEvent : IGameEvent
     public PlayerDragChangedEvent(UiCard dragged) { Dragged = dragged; }
 }
 
-public struct ZonePointerEnterEvent : IGameEvent
+public struct SlotPointerEnterEvent : IGameEvent
 {
-    public UiZone Zone;
-    public ZonePointerEnterEvent(UiZone z) { Zone = z; }
+    public UiSlot Slot;
+    public SlotPointerEnterEvent(UiSlot z) { Slot = z; }
 }
-public struct ZonePointerExitEvent : IGameEvent
+public struct SlotPointerExitEvent : IGameEvent
 {
-    public UiZone Zone;
-    public ZonePointerExitEvent(UiZone z) { Zone = z; }
+    public UiSlot Slot;
+    public SlotPointerExitEvent(UiSlot z) { Slot = z; }
+}
+
+public struct SlotDropEvent : IGameEvent
+{
+    public UiSlot Slot;
+    public UiCard Card;
+
+    public SlotDropEvent(UiSlot slot, UiCard card)
+    {
+        Slot = slot;
+        Card = card;
+    }
 }
 
 public struct BoardStateChangedEvent : IGameEvent { }

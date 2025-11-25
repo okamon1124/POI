@@ -10,16 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a2bc665db7e6aa240a1981e52aae4afa, type: 3}
-  m_Name: SealKing
+  m_Name: RangedMonster
   m_EditorClassIdentifier: Assembly-CSharp::CardData
-  cardSprite: {fileID: -2912526880213042993, guid: 700f6b1b741f1ec4d8549a6c71cebc8b, type: 3}
-  cardName: SealKing
+  cardSprite: {fileID: 5942107159716320145, guid: 6affb93f19a109643ace6bf23ed7df69, type: 3}
+  cardName: RangedMonster
   cardType: 0
-  manaCost: 8
-  power: 0
-  health: 8
-  speed: 0
+  manaCost: 2
+  power: 2
+  health: 3
+  speed: 2
   playerMoveRules:
   - {fileID: 11400000, guid: 0774f56c5dfa40a42b9c685ed5377eac, type: 2}
   - {fileID: 11400000, guid: 6d7e0185ac6b80d4f9736964e442dc8e, type: 2}
   - {fileID: 11400000, guid: 0b9ada9c97f0f3d4ca01ef62bb52bbc3, type: 2}
+  combatRules:
+  - {fileID: 11400000, guid: 73da21ba14026e444bde257a06a24172, type: 2}

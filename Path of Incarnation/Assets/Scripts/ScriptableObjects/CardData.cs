@@ -9,4 +9,6 @@ public class CardData : ScriptableObject
     public int manaCost, power, health, speed;
 
     public PlayRule[] playerMoveRules;
+
+    public CombatRule[] combatRules;
 }

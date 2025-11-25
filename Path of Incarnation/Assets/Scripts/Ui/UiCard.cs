@@ -1,9 +1,11 @@
+using DG.Tweening;
+using NaughtyAttributes;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using DG.Tweening;
-using State = StateMachine<UiCard>.State;
-using System.Collections.Generic;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.UI;
+using State = StateMachine<UiCard>.State;
 
 public class UiCard : MonoBehaviour,
     IPointerEnterHandler, IPointerExitHandler,
@@ -25,27 +27,36 @@ public class UiCard : MonoBehaviour,
     [SerializeField] private float hoverScale = 1.1f;
     [SerializeField] private float tweenDuration = 0.2f;
     [SerializeField] private Ease ease = Ease.OutQuad;
-    [SerializeField] private bool ignoreTimeScale = false;
 
-    [Header("CardData")]
-    [SerializeField] private CardData cardData;
-    public CardData CardData => cardData;
+    [Header("Logic Link")]
+    public CardInstance cardInstance;
+    public Owner Owner => cardInstance != null ? cardInstance.Owner : Owner.None;
 
-    public Team OwnerTeam = Team.Both;
+    [Header("Board Reference")]
+    [SerializeField] private UiRegistry uiRegistry;
 
-    [SerializeField] private UiZone currentZone;
-    public UiZone CurrentZone => currentZone;
+    public void BindRegistry(UiRegistry registry)
+    {
+        this.uiRegistry = registry;
+    }
 
     [Header("Visuals")]
     [SerializeField] private RectTransform visual;
 
+    [Header("Visual Refs")]
+    [SerializeField] private Image artImage;
+    [SerializeField] private TMP_Text nameText;
+    [SerializeField] private TMP_Text costText;
+    [SerializeField] private TMP_Text powerText;
+    [SerializeField] private TMP_Text healthText;
+    [SerializeField] private TMP_Text speedText;
+
     [Header("Zone Scales")]
-    [SerializeField] private float handBaseScale = 1.4f;     // bigger when in hand
-    [SerializeField] private float cellBaseScale = 1.1f;     // normal board/cell scale
-    [SerializeField] private float draggingScale = 1.1f;     // scale while dragging
+    [SerializeField] private float handBaseScale = 1.4f;
+    [SerializeField] private float cellBaseScale = 1.1f;
+    [SerializeField] private float draggingScale = 1.1f;
 
     [SerializeField] private float liftAmount = 30f;
-
     [SerializeField] private bool stateChangeDebuger = false;
 
     [Header("Availability Light")]
@@ -53,7 +64,10 @@ public class UiCard : MonoBehaviour,
     [SerializeField] private float availableLightIntensity = 1.5f;
     [SerializeField] private float unavailableLightIntensity = 0f;
 
-    private bool lastHasValidDestination;
+    [Header("Owner Light")]
+    [SerializeField] private Light2D enemyLight;
+
+    private bool _interactable = true;
 
     private enum Event : int
     {
@@ -65,16 +79,7 @@ public class UiCard : MonoBehaviour,
         EndDrag = 5,
         ReturnedToCell = 6,
         ReturnedToHand = 7,
-    }
-
-    private void OnEnable()
-    {
-        EventBus.Subscribe<BoardStateChangedEvent>(OnBoardStateChanged);
-    }
-
-    private void OnDisable()
-    {
-        EventBus.Unsubscribe<BoardStateChangedEvent>(OnBoardStateChanged);
+        NotInt
     }
 
     private void Awake()
@@ -82,11 +87,6 @@ public class UiCard : MonoBehaviour,
         rectTransform = GetComponent<RectTransform>();
         canvas = GetComponentInParent<Canvas>();
         canvasGroup = GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
-
-        if (currentZone != null)
-        {
-            currentZone.TryAdd(this);
-        }
 
         if (canvas && canvas.renderMode == RenderMode.WorldSpace && canvas.worldCamera == null)
         {
@@ -100,7 +100,7 @@ public class UiCard : MonoBehaviour,
 
         stateMachine = new StateMachine<UiCard>(this);
 
-        // ---- CELL branch ----
+        // CELL branch
         stateMachine.AddTransition<StateInCellIdle, StateInCellHovering>((int)Event.PointerEnter);
         stateMachine.AddTransition<StateInCellHovering, StateInCellIdle>((int)Event.PointerExit);
         stateMachine.AddTransition<StateInCellHovering, StateInCellPressed>((int)Event.PointerDown);
@@ -108,36 +108,32 @@ public class UiCard : MonoBehaviour,
         stateMachine.AddTransition<StateInCellPressed, StateDraggingFromCell>((int)Event.BeginDrag);
         stateMachine.AddTransition<StateDraggingFromCell, StateMovingToZone>((int)Event.EndDrag);
 
-        // Return target depends on where the card currently lives
+        // return target
         stateMachine.AddTransition<StateMovingToZone, StateInCellIdle>((int)Event.ReturnedToCell);
         stateMachine.AddTransition<StateMovingToZone, StateInHandIdle>((int)Event.ReturnedToHand);
 
-        // ---- HAND branch ----
+        // HAND branch
         stateMachine.AddTransition<StateInHandIdle, StateInHandHover>((int)Event.PointerEnter);
         stateMachine.AddTransition<StateInHandHover, StateInHandIdle>((int)Event.PointerExit);
         stateMachine.AddTransition<StateInHandHover, StateInCellPressed>((int)Event.PointerDown);
 
-
-        if (currentZone.zoneType == ZoneType.Hand)
+        var zoneType = GetCardZoneType();
+        if (zoneType == ZoneType.Hand)
             stateMachine.Start<StateInHandIdle>();
         else
             stateMachine.Start<StateInCellIdle>();
 
         stateMachine.OnStateChanged += (from, to, evt) =>
         {
+            if (!stateChangeDebuger) return;
+
             var fromName = from?.GetType().Name ?? "null";
             var toName = to?.GetType().Name ?? "null";
             string evtName = System.Enum.IsDefined(typeof(Event), evt) ? ((Event)evt).ToString() : evt.ToString();
 
-            if (stateChangeDebuger)
-            {
-                Debug.Log($"<color=white>[UiCard:{name}]</color> <color=yellow>{fromName}</color> " +
-                $"--(<color=orange>{evtName}</color>)--> <color=yellow>{toName}</color>");
-            }
+            Debug.Log($"<color=white>[UiCard:{name}]</color> <color=yellow>{fromName}</color> " +
+                      $"--(<color=orange>{evtName}</color>)--> <color=yellow>{toName}</color>");
         };
-
-        ApplyZoneScale();
-        RefreshAvailabilityLight(force: true);
     }
 
     private void Update()
@@ -145,79 +141,66 @@ public class UiCard : MonoBehaviour,
         stateMachine.Update();
     }
 
+    #region Pointer & Drag
+
     public void OnPointerEnter(PointerEventData e)
     {
         EventBus.Publish(new CardHoverEnterEvent(this));
         isPointerOver = true;
 
-        if (PlayerControlState.I.IsAnotherCardBeingDragged(this))
+        if (PlayerCardInputState.I.IsAnotherCardBeingDragged(this))
         {
-            Debug.Log("Don't scale up because another card is dragging");
+            // no hover if another card dragging
         }
         else
         {
             stateMachine.Dispatch((int)Event.PointerEnter);
         }
     }
+
     public void OnPointerExit(PointerEventData e)
     {
         EventBus.Publish(new CardHoverExitEvent(this));
         isPointerOver = false;
         stateMachine.Dispatch((int)Event.PointerExit);
     }
+
     public void OnPointerDown(PointerEventData e)
     {
-        //var zm = ZoneManager.I;
-        //var cz = CurrentZone;
-        //var czName = cz ? cz.zoneType.ToString() : "NULL";
-        //
-        //List<Zone> valids = zm ? zm.GetValidDestinations(this) : null;
-        //int zonesCount = zm?.Zones?.Count ?? -1;
-        //int validCount = valids?.Count ?? -1;
-        //
-        //Debug.Log($"[Probe] {name} click | CurrentZone={czName} | Zones={zonesCount} | Valid={validCount}");
-        //
-        //if (valids != null)
-        //    foreach (var z in valids)
-        //        Debug.Log($"[Probe] -> {z.zoneType} (full={z.IsFull})");
-
-        if (!HasValidDestination)
-        {
-            Debug.Log($"{name}: click disabled (no valid move).");
-            return;
-        }
-
-        //Debug.Log("Down");
         stateMachine.Dispatch((int)Event.PointerDown);
     }
+
     public void OnPointerUp(PointerEventData e)
     {
-        //Debug.Log("Up");
         stateMachine.Dispatch((int)Event.PointerUp);
     }
+
     public void OnInitializePotentialDrag(PointerEventData e)
     {
         e.useDragThreshold = false;
     }
+
     public void OnBeginDrag(PointerEventData e)
     {
         stateMachine.Dispatch((int)Event.BeginDrag);
     }
-    public void OnDrag(PointerEventData e)
-    {
-        //Debug.Log("OnDrag");
-    }
+
+    public void OnDrag(PointerEventData e) { }
+
     public void OnEndDrag(PointerEventData e)
     {
         EventBus.Publish(new CardDragEndEvent(this));
         stateMachine.Dispatch((int)Event.EndDrag);
     }
 
+    #endregion
+
+    #region States
+
     private class StateInCellIdle : State
     {
         protected override void OnEnter(State prevState)
         {
-            //Debug.Log("Idle in Slot");
             Owner.PlayScaleTween(Owner.initialScale);
         }
     }
@@ -226,29 +209,20 @@ public class UiCard : MonoBehaviour,
     {
         protected override void OnEnter(State prevState)
         {
-            //Debug.Log("Hovering in Slot");
             Owner.PlayScaleTween(Owner.initialScale * Owner.hoverScale);
         }
     }
 
-    private class StateInCellPressed : State //Pressed but not drgging
+    private class StateInCellPressed : State
     {
         protected override void OnEnter(State prevState)
         {
-            //Debug.Log("Pressing..");
             Owner.MoveCenterToScreen(Input.mousePosition);
-        }
-
-        protected override void OnExit(State nextState)
-        {
-            //Debug.Log("Stop Pressing");
         }
     }
 
     private class StateDraggingFromCell : State
     {
-        private Vector3 _savedScale;
-
         protected override void OnEnter(State prevState)
         {
             if (!Owner.canvasGroup)
@@ -258,8 +232,7 @@ public class UiCard : MonoBehaviour,
             Owner.canvasGroup.interactable = false;
             Owner.rectTransform.SetAsLastSibling();
 
-            // flatten rotation if dragging from hand
-            if (Owner.currentZone && Owner.currentZone.zoneType == ZoneType.Hand)
+            if (Owner.GetCardZoneType() == ZoneType.Hand)
             {
                 DOTween.Kill(Owner.rectTransform);
                 Owner.rectTransform.rotation = Quaternion.identity;
@@ -267,11 +240,8 @@ public class UiCard : MonoBehaviour,
 
             EventBus.Publish(new CardDragBeginEvent(Owner));
 
-            // --- Apply drag scale ---
-            _savedScale = Owner.rectTransform.localScale;
             Owner.rectTransform.DOScale(Vector3.one * Owner.draggingScale, Owner.tweenDuration * 0.5f)
-                .SetEase(Owner.ease)
-                .SetUpdate(Owner.ignoreTimeScale);
+                .SetEase(Owner.ease);
         }
 
         protected override void OnUpdate()
@@ -281,14 +251,10 @@ public class UiCard : MonoBehaviour,
 
         protected override void OnExit(State nextState)
         {
-            // restore raycast
-            if (Owner.canvasGroup)
-            {
-                Owner.canvasGroup.blocksRaycasts = true;
-                Owner.canvasGroup.interactable = true;
-            }
+            // 這裡不要自己猜 true / false，
+            // 直接用 UiCard 裡目前記錄的 _interactable 來還原
+            Owner.SetInteractable(Owner._interactable);
 
-            // --- Restore correct base scale for the destination zone ---
             Owner.ApplyZoneScale();
         }
     }
@@ -297,11 +263,8 @@ public class UiCard : MonoBehaviour,
     {
         protected override void OnEnter(State prevState)
         {
-            // Animate the card returning to its slot (or initial position)
             Owner.AnimateToCurrentZone();
         }
-
-        protected override void OnUpdate() { }
     }
 
     private class StateInHandIdle : State
@@ -315,7 +278,7 @@ public class UiCard : MonoBehaviour,
     private class StateInHandHover : State
     {
         private int _savedSibling;
-        private Vector3 _baseLocalPos;     // the original resting position in layout
+        private Vector3 _baseLocalPos;
         private bool _cachedBasePos = false;
 
         protected override void OnEnter(State prevState)
@@ -332,17 +295,14 @@ public class UiCard : MonoBehaviour,
             {
                 if (!_cachedBasePos)
                 {
-                    // remember the starting position only once
                     _baseLocalPos = Owner.visual.localPosition;
                     _cachedBasePos = true;
                 }
 
-                // move relative to base each time
                 Vector3 lifted = _baseLocalPos + new Vector3(0f, Owner.liftAmount, 0f);
                 Owner.visual.DOKill(false);
                 Owner.visual.DOLocalMove(lifted, Owner.tweenDuration)
                     .SetEase(Owner.ease)
-                    .SetUpdate(Owner.ignoreTimeScale)
                     .SetId("hover_vis_move");
             }
         }
@@ -352,14 +312,10 @@ public class UiCard : MonoBehaviour,
             if (Owner.visual)
             {
                 DOTween.Kill("hover_vis_move");
-
-                // Force reset position (guard against interrupted tween)
                 Owner.visual.localPosition = _baseLocalPos;
 
-                // Optional: smooth return if you want a visible motion
                 Owner.visual.DOLocalMove(_baseLocalPos, Owner.tweenDuration)
                     .SetEase(Owner.ease)
-                    .SetUpdate(Owner.ignoreTimeScale)
                     .SetId("hover_vis_move");
             }
 
@@ -370,17 +326,17 @@ public class UiCard : MonoBehaviour,
         }
     }
 
+    #endregion
+
+    #region Visual Helpers
 
     private void PlayScaleTween(Vector3 target)
     {
-        // Kill any existing tween to avoid overlap
         scaleTween?.Kill();
 
-        // Use SetUpdate(true) to run independent of Time.timeScale when desired
         scaleTween = rectTransform
             .DOScale(target, tweenDuration)
-            .SetEase(ease)
-            .SetUpdate(ignoreTimeScale);
+            .SetEase(ease);
     }
 
     private Camera UiCamera
@@ -394,73 +350,18 @@ public class UiCard : MonoBehaviour,
         }
     }
 
-    public void AnimateToCurrentZone()
-    {
-        if (currentZone == null)
-        {
-            Debug.LogError("currentZone is null; cannot return.");
-            stateMachine.Dispatch((int)Event.ReturnedToCell);
-            return;
-        }
-
-        if (currentZone.zoneType == ZoneType.Hand)
-        {
-            var layout = currentZone.GetComponent<HandSplineLayout>();
-            if (layout)
-            {
-                layout.Reflow();
-
-                // Defer the state machine event so it's not fired inside OnEnter.
-                DOVirtual.DelayedCall(0f, NotifyReturnedAndRehover)
-                    .SetUpdate(ignoreTimeScale); // keep consistent with your tweens
-                return;
-            }
-        }
-
-        // Default behavior (non-hand zones): tween pivot to zone center
-        Vector2 size = rectTransform.rect.size;
-        Vector2 localCenter2D = (new Vector2(0.5f, 0.5f) - rectTransform.pivot) * size;
-        Vector3 localCenter = new Vector3(localCenter2D.x, localCenter2D.y, 0f);
-
-        var zoneRt = currentZone.GetComponent<RectTransform>();
-        Vector3 zoneCenterWorld = zoneRt.TransformPoint(zoneRt.rect.center);
-
-        Vector3 worldOffset = rectTransform.TransformVector(localCenter);
-        Vector3 targetPivotWorld = zoneCenterWorld - worldOffset;
-
-        moveTween?.Kill();
-        moveTween = rectTransform
-            .DOMove(targetPivotWorld, tweenDuration)
-            .SetEase(ease)
-            .SetUpdate(ignoreTimeScale)
-            .OnComplete(NotifyReturnedAndRehover);
-    }
-
-    private void NotifyReturnedAndRehover()
-    {
-        // choose destination idle based on current zone
-        if (currentZone != null && currentZone.zoneType == ZoneType.Hand)
-            stateMachine.Dispatch((int)Event.ReturnedToHand);
-        else
-            stateMachine.Dispatch((int)Event.ReturnedToCell);
-
-        // re-apply hover if pointer is still over
-        if (isPointerOver)
-            stateMachine.Dispatch((int)Event.PointerEnter);
-        else
-            stateMachine.Dispatch((int)Event.PointerExit);
-    }
-
     private Vector3 MoveCenterToScreen(Vector2 screenPos)
     {
-        // pivot → center offset
         Vector2 size = rectTransform.rect.size;
         Vector2 localCenter2D = (new Vector2(0.5f, 0.5f) - rectTransform.pivot) * size;
         Vector3 localCenter = new Vector3(localCenter2D.x, localCenter2D.y, 0f);
 
         RectTransform parentRect = rectTransform.parent as RectTransform;
         if (RectTransformUtility.ScreenPointToWorldPointInRectangle(
-            parentRect ? parentRect : rectTransform, screenPos, UiCamera, out var worldPoint))
+                parentRect ? parentRect : rectTransform,
+                screenPos,
+                UiCamera,
+                out var worldPoint))
         {
             Vector3 worldOffset = rectTransform.TransformVector(localCenter);
             rectTransform.position = worldPoint - worldOffset;
@@ -469,56 +370,249 @@ public class UiCard : MonoBehaviour,
         return rectTransform.position;
     }
 
-    /// <summary>
-    /// Only ZoneManager should call this when a move actually succeeds.
-    /// </summary>
-    public void AssignZone(UiZone z)
+    public void AnimateToCurrentZone()
     {
-        currentZone = z;
+        if (cardInstance == null || cardInstance.CurrentSlot == null)
+        {
+            stateMachine.Dispatch((int)Event.ReturnedToCell);
+            return;
+        }
+
+        if (GetCardZoneType() == ZoneType.Hand)
+        {
+            var layout = GetComponentInParent<HandSplineLayout>();
+            if (layout)
+            {
+                layout.Reflow();
+
+                DOVirtual.DelayedCall(0f, NotifyReturnedAndRehover);
+                return;
+            }
+        }
+
+        var slot = cardInstance.CurrentSlot;
+        var uiSlot = uiRegistry != null ? uiRegistry.GetUiSlot(slot) : null;
+
+        if (uiSlot == null)
+        {
+            NotifyReturnedAndRehover();
+            return;
+        }
+
+        RectTransform slotRt = uiSlot.RectTransform;
+
+        Vector2 size = rectTransform.rect.size;
+        Vector2 localCenter2D = (new Vector2(0.5f, 0.5f) - rectTransform.pivot) * size;
+        Vector3 localCenter = new Vector3(localCenter2D.x, localCenter2D.y, 0f);
+
+        Vector3 slotCenterWorld = slotRt.TransformPoint(slotRt.rect.center);
+        Vector3 worldOffset = rectTransform.TransformVector(localCenter);
+        Vector3 targetPivotWorld = slotCenterWorld - worldOffset;
+
+        moveTween?.Kill();
+        moveTween = rectTransform
+            .DOMove(targetPivotWorld, tweenDuration)
+            .SetEase(ease)
+            .OnComplete(NotifyReturnedAndRehover);
+    }
+
+    public void SnapToCurrentSlot()
+    {
+        if (cardInstance == null || cardInstance.CurrentSlot == null)
+            return;
+
+        var zoneType = GetCardZoneType();
+
+        // --- HAND: no UiSlots, use spline layout ---
+        if (zoneType == ZoneType.Hand)
+        {
+            // we assume the card is already parented under CardsInHandRoot
+            // (HandDrawPresenter instantiates it there)
+            var layout = GetComponentInParent<HandSplineLayout>();
+            if (layout != null)
+            {
+                layout.Reflow();   // position all hand cards along the spline
+            }
+
+            ApplyZoneScale();
+            return;
+        }
+
+        // --- BOARD ZONES: use UiSlot parenting (old behavior) ---
+        var slot = cardInstance.CurrentSlot;
+        var uiSlot = uiRegistry != null ? uiRegistry.GetUiSlot(slot) : null;
+        if (uiSlot == null) return;
+
+        rectTransform.SetParent(uiSlot.RectTransform, worldPositionStays: false);
+        rectTransform.localPosition = Vector3.zero;
         ApplyZoneScale();
+    }
+
+
+    private void NotifyReturnedAndRehover()
+    {
+        if (GetCardZoneType() == ZoneType.Hand)
+            stateMachine.Dispatch((int)Event.ReturnedToHand);
+        else
+            stateMachine.Dispatch((int)Event.ReturnedToCell);
+
+        if (isPointerOver)
+            stateMachine.Dispatch((int)Event.PointerEnter);
+        else
+            stateMachine.Dispatch((int)Event.PointerExit);
     }
 
     private void ApplyZoneScale()
     {
         if (!rectTransform) return;
 
-        float target =
-            currentZone && currentZone.zoneType == ZoneType.Hand
+        float target = GetCardZoneType() == ZoneType.Hand
             ? handBaseScale
             : cellBaseScale;
 
         rectTransform.localScale = Vector3.one * target;
-        initialScale = rectTransform.localScale;   // update for hover baseline
+        initialScale = rectTransform.localScale;
     }
 
-    private bool HasValidDestination
+    private ZoneType GetCardZoneType()
     {
-        get
+        if (cardInstance == null || cardInstance.CurrentSlot == null || cardInstance.CurrentSlot.Zone == null)
+            return ZoneType.Hand;
+
+        return cardInstance.CurrentSlot.Zone.Type;
+    }
+
+    public void RefreshVisual()
+    {
+        if (cardInstance == null) return;
+
+        var data = cardInstance.Data;
+
+        if (artImage) artImage.sprite = data.cardSprite;
+        if (nameText) nameText.text = data.cardName;
+        if (costText) costText.text = data.manaCost.ToString();
+
+        if (powerText) powerText.text = cardInstance.CurrentPower.ToString();
+        if (healthText) healthText.text = cardInstance.CurrentHealth.ToString();
+        if (speedText) speedText.text = cardInstance.CurrentSpeed.ToString();
+
+        if (enemyLight != null)
         {
-            return ZoneManager.I != null && ZoneManager.I.HasValidDestination(this);
+            enemyLight.enabled = (Owner == Owner.Opponent);
         }
     }
 
-    private void RefreshAvailabilityLight(bool force = false)
+    public void PlayAttackImpact()
     {
-        if (!availabilityLight || ZoneManager.I == null)
+        if (rectTransform == null)
+        {
+            Debug.LogError($"[UiCard:{name}] rectTransform is null, cannot play attack impact.");
             return;
+        }
 
-        bool hasValidDestination = ZoneManager.I.HasValidDestination(this);
+        // dir：畜力方向，攻擊方向會是 -dir
+        float dir = (Owner == Owner.Opponent) ? -1f : 1f;
 
-        Debug.Log($"hasValidDestination:{hasValidDestination}");
+        // 距離
+        float windupDist = 0.2f;  // 畜力：小退
+        float attackDist = 0.5f;  // 攻擊：大撞（你說希望更長，我直接開大一點，自己再微調）
 
-        if (!force && hasValidDestination == lastHasValidDestination)
-            return; // no change, no work
+        // 節奏
+        float windupTime = 0.08f;
+        float attackTime = 0.12f;
+        float recoverTime = 0.15f;
 
-        lastHasValidDestination = hasValidDestination;
+        // 旋轉量
+        float windupAngle = 6f;    // 畜力：頭往反方向小傾斜
+        float attackAngle = 18f;   // 攻擊：頭往攻擊方向大傾斜
 
-        availabilityLight.intensity = hasValidDestination ? availableLightIntensity : unavailableLightIntensity;
+        Vector3 startPos = rectTransform.position;
+        Vector3 startEuler = rectTransform.eulerAngles;
+
+        rectTransform.DOKill();
+
+        // 位置：先往 dir 畜力，再往 -dir 攻擊
+        Vector3 windupPos = startPos + new Vector3(dir * windupDist, 0f, 0f);    // 反方向
+        Vector3 attackPos = startPos + new Vector3(-dir * attackDist, 0f, 0f);   // 攻擊方向
+
+        Sequence seq = DOTween.Sequence();
+
+        // 1) 畜力：往反方向小退 + 頭往反方向（-dir）傾一點
+        seq.Append(
+            rectTransform.DOMove(windupPos, windupTime)
+                .SetEase(Ease.OutQuad)
+        );
+        seq.Join(
+            rectTransform.DORotate(
+                    startEuler + new Vector3(0f, 0f, -dir * windupAngle),
+                    windupTime
+                )
+                .SetEase(Ease.OutQuad)
+        );
+
+        // 2) 攻擊：往 -dir 大撞 + 頭往攻擊方向（= -dir）大傾斜
+        //    但公式推完會是「dir * attackAngle」，這樣頭會對準攻擊方向
+        seq.Append(
+            rectTransform.DOMove(attackPos, attackTime)
+                .SetEase(Ease.InQuad)
+        );
+        seq.Join(
+            rectTransform.DORotate(
+                    startEuler + new Vector3(0f, 0f, dir * attackAngle),
+                    attackTime * 0.7f
+                )
+                .SetEase(Ease.OutQuad)
+        );
+
+        // 3) 收回：回到原位置 + 原角度
+        seq.Append(
+            rectTransform.DOMove(startPos, recoverTime)
+                .SetEase(Ease.OutQuad)
+        );
+        seq.Join(
+            rectTransform.DORotate(startEuler, recoverTime)
+                .SetEase(Ease.OutQuad)
+        );
     }
 
-    private void OnBoardStateChanged(BoardStateChangedEvent ev)
+    #endregion
+
+    #region Public API for Logic
+
+    public void SetInteractable(bool interactable)
     {
-        
-        RefreshAvailabilityLight(force: true);
+        _interactable = interactable;   // ← 記起來
+
+        if (!canvasGroup)
+            canvasGroup = GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
+
+        canvasGroup.blocksRaycasts = interactable;
+        canvasGroup.interactable = interactable;
+
+        RefreshAvailabilityLight(interactable);
     }
+
+
+    private void RefreshAvailabilityLight(bool interactable)
+    {
+        if (!availabilityLight) return;
+
+        availabilityLight.intensity = interactable
+            ? availableLightIntensity
+            : unavailableLightIntensity;
+    }
+
+    #endregion
+
+#if UNITY_EDITOR
+    [Button("Debug: Play Attack Impact")]
+    private void Debug_PlayAttackImpact()
+    {
+        if (!rectTransform)
+            rectTransform = GetComponent<RectTransform>();
+
+        Debug.Log($"[UiCard:{name}] Debug PlayAttackImpact()");
+        PlayAttackImpact();
+    }
+#endif
 }
