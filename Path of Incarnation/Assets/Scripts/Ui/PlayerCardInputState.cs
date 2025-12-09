@@ -3,7 +3,6 @@ using UnityEngine;
 public class PlayerCardInputState : Singleton<PlayerCardInputState>
 {
     private int _hoverCount = 0;
-
     private UiCard _hovering = null;
     private UiCard _dragging = null;
 
@@ -35,7 +34,6 @@ public class PlayerCardInputState : Singleton<PlayerCardInputState>
     private void OnHoverEnter(CardHoverEnterEvent e)
     {
         _hoverCount++;
-
         // prefer most-recent card as focused hover
         if (_hovering != e.Card)
         {
@@ -48,15 +46,28 @@ public class PlayerCardInputState : Singleton<PlayerCardInputState>
     {
         _hoverCount = Mathf.Max(0, _hoverCount - 1);
 
+        // Only clear _hovering if this was the current hovered card
         if (_hovering == e.Card)
         {
-            _hovering = null;
-
-            // Only announce "no hover" if truly none left
-            if (_hoverCount == 0)
-                EventBus.Publish(new PlayerHoverChangedEvent(null));
+            // Don't immediately set to null - wait one frame to see if we're entering another card
+            StartCoroutine(DelayedHoverClear());
         }
-        // If another card is still hovered, its Enter already set focus.
+    }
+
+    private System.Collections.IEnumerator DelayedHoverClear()
+    {
+        // Store the current hovering card
+        UiCard previouslyHovering = _hovering;
+
+        // Wait one frame
+        yield return null;
+
+        // If we're still not hovering over anything new, clear it
+        if (_hovering == previouslyHovering && _hoverCount == 0)
+        {
+            _hovering = null;
+            EventBus.Publish(new PlayerHoverChangedEvent(null));
+        }
     }
 
     private void OnDragBegin(CardDragBeginEvent e)
@@ -80,10 +91,9 @@ public class PlayerCardInputState : Singleton<PlayerCardInputState>
     public bool IsAnotherCardBeingDragged(UiCard card)
     {
         bool anotherDragging =
-        IsValid() &&
-        IsDragging &&
-        DraggingCard != card;
-
+            IsValid() &&
+            IsDragging &&
+            DraggingCard != card;
         return anotherDragging;
     }
 }

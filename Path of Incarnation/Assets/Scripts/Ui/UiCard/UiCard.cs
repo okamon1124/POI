@@ -45,6 +45,7 @@ public class UiCard : MonoBehaviour,
     private Vector3 initialScale;
     private bool isPointerOver;
     private bool isInteractable = true;
+    private bool canDrag = true;
 
     #endregion
 
@@ -88,6 +89,14 @@ public class UiCard : MonoBehaviour,
     private void Update()
     {
         stateMachine?.Update();
+    }
+
+    private void OnDestroy()
+    {
+        // Stop all tweens on this object to avoid callbacks after destroy
+        DOTween.Kill(rectTransform);
+        if (visuals?.Visual != null)
+            DOTween.Kill(visuals.Visual);
     }
 
     #endregion
@@ -181,6 +190,11 @@ public class UiCard : MonoBehaviour,
 
     #region Pointer & Drag Events
 
+    public void SetCanDrag(bool canDrag)
+    {
+        this.canDrag = canDrag;
+    }
+
     public void OnPointerEnter(PointerEventData e)
     {
         EventBus.Publish(new CardHoverEnterEvent(this));
@@ -201,12 +215,25 @@ public class UiCard : MonoBehaviour,
 
     public void OnPointerDown(PointerEventData e)
     {
+        if (!isInteractable) return;
+        if (!canDrag) return;
+
         stateMachine.Dispatch((int)Event.PointerDown);
     }
 
     public void OnPointerUp(PointerEventData e)
     {
+        // Always allow pointer up so FSM can leave pressed state correctly
         stateMachine.Dispatch((int)Event.PointerUp);
+    }
+
+    public void OnBeginDrag(PointerEventData e)
+    {
+        if (!isInteractable) return;
+        if (!canDrag) return;
+
+        EventBus.Publish(new CardDragBeginEvent(this));
+        stateMachine.Dispatch((int)Event.BeginDrag);
     }
 
     public void OnInitializePotentialDrag(PointerEventData e)
@@ -214,15 +241,11 @@ public class UiCard : MonoBehaviour,
         e.useDragThreshold = false;
     }
 
-    public void OnBeginDrag(PointerEventData e)
-    {
-        stateMachine.Dispatch((int)Event.BeginDrag);
-    }
-
     public void OnDrag(PointerEventData e) { }
 
     public void OnEndDrag(PointerEventData e)
     {
+        // Always allow ending the drag if it started
         EventBus.Publish(new CardDragEndEvent(this));
         stateMachine.Dispatch((int)Event.EndDrag);
     }
@@ -272,14 +295,12 @@ public class UiCard : MonoBehaviour,
         canvasGroup.blocksRaycasts = false;
         canvasGroup.interactable = false;
 
-        // Reset rotation if in hand
         if (GetCardZoneType() == ZoneType.Hand)
         {
             DOTween.Kill(rectTransform);
             rectTransform.rotation = Quaternion.identity;
         }
 
-        EventBus.Publish(new CardDragBeginEvent(this));
         animator.StartDragging();
     }
 
@@ -394,10 +415,10 @@ public class UiCard : MonoBehaviour,
     {
         isInteractable = interactable;
 
-        canvasGroup.blocksRaycasts = interactable;
+        canvasGroup.blocksRaycasts = true;
         canvasGroup.interactable = interactable;
 
-        visuals?.SetAvailabilityLight(interactable);
+        visuals?.SetAvailabilityLight(interactable, GetCardZoneType());
     }
 
     public void BindRegistry(UiRegistry registry)
@@ -411,12 +432,16 @@ public class UiCard : MonoBehaviour,
 
     private void RestoreInteractableState()
     {
-        canvasGroup.blocksRaycasts = isInteractable;
+        // After drag, always allow hover again
+        canvasGroup.blocksRaycasts = true;
         canvasGroup.interactable = isInteractable;
     }
 
     private void NotifyReturnedAndRehover()
     {
+        if (this == null || stateMachine == null)
+            return;
+
         // Dispatch return event
         if (GetCardZoneType() == ZoneType.Hand)
             stateMachine.Dispatch((int)Event.ReturnedToHand);
@@ -429,7 +454,6 @@ public class UiCard : MonoBehaviour,
         else
             stateMachine.Dispatch((int)Event.PointerExit);
     }
-
 
     private void ApplyZoneScale()
     {
@@ -530,7 +554,6 @@ public class UiCard : MonoBehaviour,
         Debug.Log($"[UiCard:{name}] Card root is: {this.name}");
         Debug.Log($"[UiCard:{name}] Testing lift. Current anchored pos: {visuals.Visual.anchoredPosition}");
 
-        // Check if visual has any visible components
         var images = visuals.Visual.GetComponentsInChildren<UnityEngine.UI.Image>();
         var texts = visuals.Visual.GetComponentsInChildren<TMPro.TMP_Text>();
         Debug.Log($"[UiCard:{name}] Visual has {images.Length} Images and {texts.Length} Texts in children");
@@ -541,7 +564,8 @@ public class UiCard : MonoBehaviour,
         Vector3 basePos = visuals.Visual.anchoredPosition;
         animator?.LiftVisual(basePos);
 
-        DOVirtual.DelayedCall(1f, () => {
+        DOVirtual.DelayedCall(1f, () =>
+        {
             Debug.Log($"[UiCard:{name}] After 1 second, pos is: {visuals.Visual.anchoredPosition}");
             animator?.LowerVisual(basePos);
         });

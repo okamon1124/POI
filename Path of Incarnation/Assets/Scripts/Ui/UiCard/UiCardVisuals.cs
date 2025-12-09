@@ -21,8 +21,14 @@ public class UiCardVisuals : MonoBehaviour
     [SerializeField] private Light2D availabilityLight;
     [SerializeField] private Light2D enemyLight;
 
+    [Header("Availability Outline")]
+    [SerializeField] private GameObject availabilityOutline;
+
     [Header("Visual Transform")]
     [SerializeField] private RectTransform visual;
+
+    [Header("Card Type Visuals")]
+    [SerializeField] private GameObject creatureOnlyRoot;
 
     private UiCardConfig config;
 
@@ -42,6 +48,9 @@ public class UiCardVisuals : MonoBehaviour
 
         var data = cardInstance.Data;
 
+        // Update card type visuals
+        UpdateCardTypeVisuals(data.cardType);
+
         // Update sprites and text
         if (artImage) artImage.sprite = data.cardSprite;
         if (nameText) nameText.text = data.cardName;
@@ -57,15 +66,33 @@ public class UiCardVisuals : MonoBehaviour
     }
 
     /// <summary>
-    /// Updates the availability light based on interactable state.
+    /// Shows/hides creature-specific visuals based on card type.
     /// </summary>
-    public void SetAvailabilityLight(bool isAvailable)
+    private void UpdateCardTypeVisuals(CardType cardType)
     {
-        if (!availabilityLight || config == null) return;
+        if (creatureOnlyRoot)
+        {
+            creatureOnlyRoot.SetActive(cardType == CardType.Creature);
+        }
+    }
 
-        availabilityLight.intensity = isAvailable
-            ? config.availableLightIntensity
-            : config.unavailableLightIntensity;
+    /// <summary>
+    /// Updates the availability light and outline based on interactable state.
+    /// </summary>
+    public void SetAvailabilityLight(bool isAvailable, ZoneType zoneType = ZoneType.Hand)
+    {
+        if (availabilityLight && config != null)
+        {
+            availabilityLight.intensity = isAvailable
+                ? config.availableLightIntensity
+                : config.unavailableLightIntensity;
+        }
+
+        if (availabilityOutline)
+        {
+            // Outline only shows in hand, never on field
+            availabilityOutline.SetActive(isAvailable && zoneType == ZoneType.Hand);
+        }
     }
 
     /// <summary>

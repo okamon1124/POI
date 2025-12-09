@@ -40,3 +40,9 @@ public struct SlotDropEvent : IGameEvent
 }
 
 public struct BoardStateChangedEvent : IGameEvent { }
+
+public struct UiCardSettledEvent : IGameEvent
+{
+    public UiCard Card;
+    public UiCardSettledEvent(UiCard card) => Card = card;
+}

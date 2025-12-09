@@ -65,7 +65,7 @@ public class HandSplineLayout : MonoBehaviour
         }
 
         if (logicalOrder.Count != actualChildCount)
-            RefreshLogicalOrder();
+            NotifyCardsChanged(true);  // <-- Changed: reset z-order when cards change
 
         int n = logicalOrder.Count;
         if (n == 0) return;
@@ -167,11 +167,27 @@ public class HandSplineLayout : MonoBehaviour
     public void RefreshLogicalOrder()
     {
         logicalOrder.Clear();
+
+        // Collect all cards
+        var cards = new List<UiCard>();
         foreach (Transform child in cardsRoot)
         {
             var uiCard = child.GetComponent<UiCard>();
             if (uiCard != null)
-                logicalOrder.Add(uiCard);
+                cards.Add(uiCard);
+        }
+
+        // Sort by the MODEL's slot index, not sibling index
+        logicalOrder = cards
+            .Where(c => c.cardInstance?.CurrentSlot != null)
+            .OrderBy(c => c.cardInstance.CurrentSlot.Index)
+            .ToList();
+
+        // Always sync sibling indices to match logical order immediately
+        for (int i = 0; i < logicalOrder.Count; i++)
+        {
+            if (logicalOrder[i] != null)
+                logicalOrder[i].transform.SetSiblingIndex(i);
         }
     }
 
@@ -191,8 +207,12 @@ public class HandSplineLayout : MonoBehaviour
                 actualChildCount++;
         }
 
-        if (logicalOrder.Count != actualChildCount)
-            RefreshLogicalOrder();
+        bool cardsChanged = logicalOrder.Count != actualChildCount;
+        if (cardsChanged)
+        {
+            // Reset z-order first, then we'll apply pyramid below
+            NotifyCardsChanged(true);
+        }
 
         if (hoveredCard == null)
         {
@@ -232,8 +252,19 @@ public class HandSplineLayout : MonoBehaviour
     /// <summary>
     /// Call when cards are added or removed from hand.
     /// </summary>
-    public void NotifyCardsChanged()
+    /// <param name="forceResetZOrder">True when cards added/removed, resets z-order to side-to-side</param>
+    public void NotifyCardsChanged(bool forceResetZOrder = true)
     {
         RefreshLogicalOrder();
+
+        if (forceResetZOrder)
+        {
+            // Reset sibling order to match logical order (left-to-right)
+            for (int i = 0; i < logicalOrder.Count; i++)
+            {
+                if (logicalOrder[i] != null)
+                    logicalOrder[i].transform.SetSiblingIndex(i);
+            }
+        }
     }
 }

@@ -58,9 +58,51 @@ ShaderVariantCollection:
         passType: 0
       - keywords: COLOR_FILTER EDGE_SHINY
         passType: 0
+      - keywords: DETAIL_MASKING EDGE_PLAIN
+        passType: 0
+      - keywords: DETAIL_MULTIPLY EDGE_PLAIN
+        passType: 0
       - keywords: EDGE_PLAIN
         passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_BLUR_DETAIL
+        passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_BLUR_FAST
+        passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_BLUR_FAST TARGET_HUE
+        passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_BLUR_FAST TRANSITION_BURN
+        passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_BLUR_FAST TRANSITION_CUTOFF
+        passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_BLUR_FAST TRANSITION_DISSOLVE
+        passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_BLUR_FAST TRANSITION_FADE
+        passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_BLUR_FAST TRANSITION_MELT
+        passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_BLUR_FAST TRANSITION_SHINY
+        passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_BLUR_MEDIUM
+        passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_EDGE_ALPHA
+        passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_EDGE_ALPHA TRANSITION_FADE
+        passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_EDGE_LUMINANCE
+        passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_PIXELATION
+        passType: 0
+      - keywords: EDGE_PLAIN SAMPLING_RGB_SHIFT
+        passType: 0
+      - keywords: EDGE_PLAIN TONE_GRAYSCALE
+        passType: 0
+      - keywords: EDGE_PLAIN TONE_RETRO
+        passType: 0
+      - keywords: EDGE_PLAIN TRANSITION_FADE
+        passType: 0
       - keywords: EDGE_SHINY
+        passType: 0
+      - keywords: GRADATION_COLOR2
         passType: 0
       - keywords: TRANSITION_DISSOLVE
         passType: 0

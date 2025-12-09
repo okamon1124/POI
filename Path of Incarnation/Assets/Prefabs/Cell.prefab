@@ -58,7 +58,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_Color: {r: 0, g: 0, b: 0, a: 0.8627451}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -165,10 +165,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 74c7040bf2efb71428608dee12962c48, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UiSlot
+  NextUiSlot: {fileID: 0}
   highlightLight: {fileID: 3597913480802521802}
   offIntensity: 0
-  availableIntensity: 1.2
-  hotIntensity: 2
+  availableIntensity: 2.5
+  hotIntensity: 5
   fadeDuration: 0.2
   ease: 6
 --- !u!1 &7543028307689210305
