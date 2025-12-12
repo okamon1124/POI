@@ -6,7 +6,14 @@ using DG.Tweening;
 /// <summary>
 /// Presents phase state changes to the UI (Model -> View).
 /// Listens to PhaseManager events and updates visual elements.
-/// Does NOT handle input - that's handled by PhaseInputHandler.
+/// 
+/// ONLY handles visual presentation:
+/// - Phase text display
+/// - Turn counter
+/// - Phase banners
+/// - Button states (visual only)
+/// 
+/// Does NOT handle input - that's CardInputPolicy + CardDropInputHandler.
 /// </summary>
 public class PhaseUIPresenter : MonoBehaviour
 {
@@ -35,9 +42,6 @@ public class PhaseUIPresenter : MonoBehaviour
     [SerializeField] private bool showMovementPhaseBanner = true;
     [SerializeField] private bool showCombatPhaseBanner = true;
     [SerializeField] private bool showEnemyTurnBanner = false;
-
-    [Header("Hand Root")]
-    [SerializeField] private RectTransform cardsInHandRoot;
 
     private PhaseManager _phaseManager;
     private Sequence _bannerSequence;
@@ -83,9 +87,6 @@ public class PhaseUIPresenter : MonoBehaviour
             UpdateButtonState(_phaseManager.CurrentPhase);
             UpdatePhaseDisplay(_phaseManager.CurrentPhase);
             UpdateTurnCounter(_phaseManager.TurnNumber);
-
-            // Also sync drag state once on init
-            OnPhaseEntered(_phaseManager.CurrentPhase);
         }
     }
 
@@ -120,18 +121,8 @@ public class PhaseUIPresenter : MonoBehaviour
         UpdatePhaseDisplay(phase);
         ShowPhaseBanner(phase);
 
-        // --- NEW: enable card drag only in Main phase, only for cards in hand ---
-        bool canDragCards = (phase == PhaseType.Main);
-
-        if (cardsInHandRoot != null)
-        {
-            // includeInactive = true so cards that might be temporarily disabled still get updated
-            var handCards = cardsInHandRoot.GetComponentsInChildren<UiCard>(includeInactive: true);
-            foreach (var card in handCards)
-            {
-                card.SetCanDrag(canDragCards);
-            }
-        }
+        // NOTE: Drag permission is now handled by CardInputPolicy
+        // This presenter only updates visuals
     }
 
     private void OnPhaseExited(PhaseType phase)

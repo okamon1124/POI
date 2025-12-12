@@ -30,6 +30,9 @@ public class UiCard : MonoBehaviour,
     [Header("Board Reference")]
     [SerializeField] private UiRegistry uiRegistry;
 
+    // Input policy (injected) - single source of truth for drag permissions
+    private CardInputPolicy inputPolicy;
+
     #endregion
 
     #region Logic Link
@@ -45,7 +48,6 @@ public class UiCard : MonoBehaviour,
     private Vector3 initialScale;
     private bool isPointerOver;
     private bool isInteractable = true;
-    private bool canDrag = true;
 
     #endregion
 
@@ -190,18 +192,31 @@ public class UiCard : MonoBehaviour,
 
     #region Pointer & Drag Events
 
-    public void SetCanDrag(bool canDrag)
+    /// <summary>
+    /// Check if dragging is currently allowed.
+    /// Combines: InputPolicy (phase check) AND isInteractable (valid moves check).
+    /// </summary>
+    private bool CanDrag
     {
-        this.canDrag = canDrag;
+        get
+        {
+            // Must be interactable (has valid moves, set by CardAvailabilityPresenter)
+            if (!isInteractable) return false;
+
+            // Must be in valid phase (checked by InputPolicy)
+            if (inputPolicy != null && !inputPolicy.CanStartDrag) return false;
+
+            return true;
+        }
     }
 
     public void OnPointerEnter(PointerEventData e)
     {
-        EventBus.Publish(new CardHoverEnterEvent(this));
         isPointerOver = true;
 
         if (!PlayerCardInputState.I.IsAnotherCardBeingDragged(this))
         {
+            EventBus.Publish(new CardHoverEnterEvent(this));  // Moved inside check
             stateMachine.Dispatch((int)Event.PointerEnter);
         }
     }
@@ -216,8 +231,8 @@ public class UiCard : MonoBehaviour,
     public void OnPointerDown(PointerEventData e)
     {
         if (!isInteractable) return;
-        if (!canDrag) return;
-
+        if (!CanDrag) return;
+        EventBus.Publish(new CardGrabbedEvent(this));
         stateMachine.Dispatch((int)Event.PointerDown);
     }
 
@@ -230,7 +245,10 @@ public class UiCard : MonoBehaviour,
     public void OnBeginDrag(PointerEventData e)
     {
         if (!isInteractable) return;
-        if (!canDrag) return;
+        if (!CanDrag) return;
+
+        // Notify the policy that a drag has started
+        inputPolicy?.NotifyDragStarted();
 
         EventBus.Publish(new CardDragBeginEvent(this));
         stateMachine.Dispatch((int)Event.BeginDrag);
@@ -245,6 +263,9 @@ public class UiCard : MonoBehaviour,
 
     public void OnEndDrag(PointerEventData e)
     {
+        // Notify the policy that drag has ended
+        inputPolicy?.NotifyDragEnded();
+
         // Always allow ending the drag if it started
         EventBus.Publish(new CardDragEndEvent(this));
         stateMachine.Dispatch((int)Event.EndDrag);
@@ -424,6 +445,14 @@ public class UiCard : MonoBehaviour,
     public void BindRegistry(UiRegistry registry)
     {
         this.uiRegistry = registry;
+    }
+
+    /// <summary>
+    /// Inject the input policy. Call this after instantiating the card.
+    /// </summary>
+    public void BindInputPolicy(CardInputPolicy policy)
+    {
+        this.inputPolicy = policy;
     }
 
     #endregion

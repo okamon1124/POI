@@ -1,46 +1,57 @@
 ﻿using UnityEngine;
 
+/// <summary>
+/// Presenter that updates card visual availability based on game state.
+/// 
+/// Responsibilities:
+/// - Updates card interactable state (visual feedback like outline/glow)
+/// - Responds to board changes and phase changes
+/// 
+/// Does NOT control drag permission directly - that's handled by:
+/// - CardInputPolicy (phase-based permission)
+/// - UiCard combines policy + interactable state for final drag decision
+/// </summary>
 public class CardAvailabilityPresenter : MonoBehaviour
 {
-    private Board board;
-    private UiRegistry registry;
-    private PhaseManager phaseManager;
+    private Board _board;
+    private UiRegistry _registry;
+    private PhaseManager _phaseManager;
 
-    public void Initialize(Board boardController, UiRegistry uiRegistry, PhaseManager phaseManager)
+    public void Initialize(Board board, UiRegistry uiRegistry, PhaseManager phaseManager)
     {
-        board = boardController;
-        registry = uiRegistry;
-        this.phaseManager = phaseManager;
+        _board = board;
+        _registry = uiRegistry;
+        _phaseManager = phaseManager;
 
-        board.OnCardMoved += OnBoardChanged;
-        board.OnCardSpawned += OnBoardChanged;
+        _board.OnCardMoved += OnCardMoved;
+        _board.OnCardSpawned += OnCardSpawned;
 
-        if (phaseManager != null)
+        if (_phaseManager != null)
         {
-            phaseManager.OnPhaseEntered += OnPhaseEntered;
+            _phaseManager.OnPhaseEntered += OnPhaseEntered;
         }
     }
 
     private void OnDestroy()
     {
-        if (board != null)
+        if (_board != null)
         {
-            board.OnCardMoved -= OnBoardChanged;
-            board.OnCardSpawned -= OnBoardChanged;
+            _board.OnCardMoved -= OnCardMoved;
+            _board.OnCardSpawned -= OnCardSpawned;
         }
 
-        if (phaseManager != null)
+        if (_phaseManager != null)
         {
-            phaseManager.OnPhaseEntered -= OnPhaseEntered;
+            _phaseManager.OnPhaseEntered -= OnPhaseEntered;
         }
     }
 
-    private void OnBoardChanged(CardInstance card, Slot from, Slot to)
+    private void OnCardMoved(CardInstance card, Slot from, Slot to)
     {
         RefreshAvailability();
     }
 
-    private void OnBoardChanged(CardInstance card, Slot slot)
+    private void OnCardSpawned(CardInstance card, Slot slot)
     {
         RefreshAvailability();
     }
@@ -50,22 +61,29 @@ public class CardAvailabilityPresenter : MonoBehaviour
         RefreshAvailability();
     }
 
+    /// <summary>
+    /// Refresh visual availability for all player cards.
+    /// Sets interactable state based on whether the card has valid moves.
+    /// </summary>
     private void RefreshAvailability()
     {
-        bool isMainPhase = phaseManager?.CurrentPhase == PhaseType.Main;
+        // Only show cards as "available" during main phase
+        bool isMainPhase = _phaseManager?.CurrentPhase == PhaseType.Main;
 
-        foreach (var uiCard in registry.GetUiCardsByOwner(Owner.Player))
+        foreach (var uiCard in _registry.GetUiCardsByOwner(Owner.Player))
         {
             var instance = uiCard.cardInstance;
             if (instance == null) continue;
 
-            bool canMove = board.HasValidDestination(instance, MoveType.Player);
+            // Check if card has any valid destination
+            bool hasValidMoves = _board.HasValidDestination(instance, MoveType.Player);
 
-            // Interactable = has valid moves (affects outline/light)
-            uiCard.SetInteractable(canMove);
+            // Card is interactable if it's main phase AND has valid moves
+            // This affects visual feedback (outline, glow, etc.)
+            // Actual drag permission is determined by UiCard using InputPolicy + this interactable state
+            bool isAvailable = isMainPhase && hasValidMoves;
 
-            // CanDrag = main phase AND has valid moves (affects actual dragging)
-            uiCard.SetCanDrag(isMainPhase && canMove);
+            uiCard.SetInteractable(isAvailable);
         }
     }
 }

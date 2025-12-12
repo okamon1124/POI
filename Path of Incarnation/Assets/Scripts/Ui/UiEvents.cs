@@ -46,3 +46,39 @@ public struct UiCardSettledEvent : IGameEvent
     public UiCard Card;
     public UiCardSettledEvent(UiCard card) => Card = card;
 }
+
+/// <summary>
+/// Fired by CombatPresenter at the moment of attack impact (for audio timing).
+/// </summary>
+public struct CombatImpactEvent : IGameEvent
+{
+    public bool IsPlayer;
+    public CombatImpactEvent(bool isPlayer) => IsPlayer = isPlayer;
+}
+
+public struct CardDrawnEvent : IGameEvent
+{
+    public UiCard Card;
+    public CardDrawnEvent(UiCard c) => Card = c;
+}
+
+/// <summary>
+/// Fired when a slot becomes "Hot" (valid drop target while hovering during drag).
+/// Published by SlotHighlightPresenter.
+/// </summary>
+public struct SlotHighlightHotEvent : IGameEvent
+{
+    public UiSlot Slot;
+    public SlotHighlightHotEvent(UiSlot slot) => Slot = slot;
+}
+
+/// <summary>
+/// Fired when player presses down on a card (before drag starts).
+/// This is the moment the card snaps to mouse position.
+/// Published by UiCard.OnPointerDown.
+/// </summary>
+public struct CardGrabbedEvent : IGameEvent
+{
+    public UiCard Card;
+    public CardGrabbedEvent(UiCard c) => Card = c;
+}

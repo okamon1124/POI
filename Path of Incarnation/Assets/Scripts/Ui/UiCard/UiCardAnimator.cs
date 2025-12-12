@@ -18,6 +18,7 @@ public class UiCardAnimator
     }
 
     // ---------------------------- Scale ----------------------------
+
     public void PlayScaleTween(Vector3 targetScale)
     {
         scaleTween?.Kill();
@@ -33,11 +34,12 @@ public class UiCardAnimator
     }
 
     // ---------------------------- Hover Lift ----------------------------
+
     public void LiftVisual(Vector3 baseLocalPos)
     {
         if (!visual) return;
-        visual.DOKill(false);
 
+        visual.DOKill(false);
         visual.DOAnchorPos(new Vector2(baseLocalPos.x, baseLocalPos.y + config.liftAmount),
                            config.tweenDuration)
               .SetEase(config.ease)
@@ -47,8 +49,8 @@ public class UiCardAnimator
     public void LowerVisual(Vector3 baseLocalPos)
     {
         if (!visual) return;
-        DOTween.Kill("hover_vis_move");
 
+        DOTween.Kill("hover_vis_move");
         visual.DOAnchorPos(new Vector2(baseLocalPos.x, baseLocalPos.y),
                            config.tweenDuration)
               .SetEase(config.ease)
@@ -56,6 +58,7 @@ public class UiCardAnimator
     }
 
     // ---------------------------- Movement ----------------------------
+
     public void AnimateToPosition(Vector3 worldPosition, System.Action onComplete = null)
     {
         moveTween?.Kill();
@@ -70,7 +73,6 @@ public class UiCardAnimator
                 {
                     EventBus.Publish(new UiCardSettledEvent(card));
                 }
-
                 onComplete?.Invoke();
             });
     }
@@ -82,12 +84,69 @@ public class UiCardAnimator
     }
 
     // ---------------------------- Attack ----------------------------
-    public void PlayAttackImpact(float direction)
+
+    /// <summary>
+    /// Play attack impact animation - card winds up, lunges forward, then returns.
+    /// Fires CombatImpactEvent at the exact moment of impact.
+    /// </summary>
+    /// <param name="direction">1 for player (right), -1 for opponent (left)</param>
+    /// <param name="isPlayer">Used for the CombatImpactEvent</param>
+    public void PlayAttackImpact(float direction, bool isPlayer = true)
     {
-        // unchanged...
+        if (!rectTransform) return;
+
+        // Store original state
+        Vector3 originalPos = rectTransform.anchoredPosition;
+
+        // Calculate offsets based on direction (horizontal - X axis)
+        // Player attacks left (direction = 1), opponent attacks right (direction = -1)
+        Vector3 windupOffset = new Vector3(config.windupDistance * 100f * direction, 0f, 0f);
+        Vector3 attackOffset = new Vector3(-config.attackDistance * 100f * direction, 0f, 0f);
+
+        float windupRotation = -config.windupAngle * direction;
+        float attackRotation = config.attackAngle * direction;
+
+        // Kill any existing attack tweens
+        DOTween.Kill(rectTransform, "attack");
+
+        // Create attack sequence: windup -> attack -> recover
+        Sequence attackSequence = DOTween.Sequence();
+
+        // Phase 1: Windup - pull back and rotate
+        attackSequence.Append(rectTransform
+            .DOAnchorPos(originalPos + windupOffset, config.windupTime)
+            .SetEase(Ease.OutQuad));
+        attackSequence.Join(rectTransform
+            .DOLocalRotate(new Vector3(0f, 0f, windupRotation), config.windupTime)
+            .SetEase(Ease.OutQuad));
+
+        // Phase 2: Attack - lunge forward with rotation
+        attackSequence.Append(rectTransform
+            .DOAnchorPos(originalPos + attackOffset, config.attackTime)
+            .SetEase(Ease.OutQuad));
+        attackSequence.Join(rectTransform
+            .DOLocalRotate(new Vector3(0f, 0f, attackRotation), config.attackTime)
+            .SetEase(Ease.OutQuad));
+
+        // Fire impact event at the exact moment attack phase completes
+        attackSequence.AppendCallback(() =>
+        {
+            EventBus.Publish(new CombatImpactEvent(isPlayer));
+        });
+
+        // Phase 3: Recover - return to original position and rotation
+        attackSequence.Append(rectTransform
+            .DOAnchorPos(originalPos, config.recoverTime)
+            .SetEase(Ease.OutBack));
+        attackSequence.Join(rectTransform
+            .DOLocalRotate(Vector3.zero, config.recoverTime)
+            .SetEase(Ease.OutBack));
+
+        attackSequence.SetId("attack");
     }
 
     // ---------------------------- Drag ----------------------------
+
     public void StartDragging()
     {
         rectTransform
@@ -96,6 +155,7 @@ public class UiCardAnimator
     }
 
     // ---------------------------- Cleanup ----------------------------
+
     public void KillAllTweens()
     {
         scaleTween?.Kill();
@@ -103,5 +163,6 @@ public class UiCardAnimator
         rectTransform?.DOKill();
         visual?.DOKill();
         DOTween.Kill("hover_vis_move");
+        DOTween.Kill("attack");
     }
 }

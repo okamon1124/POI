@@ -16,14 +16,14 @@ MonoBehaviour:
   tweenDuration: 0.2
   ease: 6
   handBaseScale: 1.4
-  cellBaseScale: 1.1
+  cellBaseScale: 1.15
   draggingScale: 1
   liftAmount: 30
   availableLightIntensity: 10
   unavailableLightIntensity: 0
-  windupDistance: 0.2
+  windupDistance: 0.5
   attackDistance: 0.5
-  windupTime: 0.08
+  windupTime: 0.2
   attackTime: 0.12
   recoverTime: 0.15
   windupAngle: 6

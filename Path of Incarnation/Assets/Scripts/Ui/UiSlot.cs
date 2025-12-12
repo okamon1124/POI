@@ -24,9 +24,9 @@ public class UiSlot : MonoBehaviour,
 
     [Header("Highlight")]
     [SerializeField] private Light2D highlightLight;
-    [SerializeField, Range(0, 5)] private float offIntensity = 0f;
-    [SerializeField, Range(0, 5)] private float availableIntensity = 1.2f;
-    [SerializeField, Range(0, 5)] private float hotIntensity = 2.0f;
+    [SerializeField, Range(0, 10)] private float offIntensity = 0f;
+    [SerializeField, Range(0, 10)] private float availableIntensity = 1.2f;
+    [SerializeField, Range(0, 10)] private float hotIntensity = 2.0f;
     [SerializeField] private float fadeDuration = 0.2f;
     [SerializeField] private Ease ease = Ease.OutQuad;
 

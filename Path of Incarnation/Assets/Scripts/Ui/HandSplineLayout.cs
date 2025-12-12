@@ -65,12 +65,10 @@ public class HandSplineLayout : MonoBehaviour
         }
 
         if (logicalOrder.Count != actualChildCount)
-            NotifyCardsChanged(true);  // <-- Changed: reset z-order when cards change
+            NotifyCardsChanged(true);  // Reset z-order when cards change
 
         int n = logicalOrder.Count;
         if (n == 0) return;
-
-        // ... rest of Reflow uses logicalOrder instead of sibling indices ...
 
         // Clamp and normalize range
         float a = Mathf.Clamp01(tStart);
@@ -164,6 +162,10 @@ public class HandSplineLayout : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Refreshes the logical order of cards based on draw order.
+    /// This ensures new cards always appear on the right side.
+    /// </summary>
     public void RefreshLogicalOrder()
     {
         logicalOrder.Clear();
@@ -177,10 +179,11 @@ public class HandSplineLayout : MonoBehaviour
                 cards.Add(uiCard);
         }
 
-        // Sort by the MODEL's slot index, not sibling index
+        // Sort by DrawOrder (when the card was drawn), NOT by slot index
+        // This ensures new cards always go to the right regardless of which slot they occupy
         logicalOrder = cards
-            .Where(c => c.cardInstance?.CurrentSlot != null)
-            .OrderBy(c => c.cardInstance.CurrentSlot.Index)
+            .Where(c => c.cardInstance != null)
+            .OrderBy(c => c.cardInstance.DrawOrder)
             .ToList();
 
         // Always sync sibling indices to match logical order immediately
@@ -259,7 +262,7 @@ public class HandSplineLayout : MonoBehaviour
 
         if (forceResetZOrder)
         {
-            // Reset sibling order to match logical order (left-to-right)
+            // Reset sibling order to match logical order (left-to-right by draw order)
             for (int i = 0; i < logicalOrder.Count; i++)
             {
                 if (logicalOrder[i] != null)

@@ -13,6 +13,7 @@ public class ManaUIPresenter : MonoBehaviour
     private ManaSystem _manaSystem;
     private int _previewCost = 0;
     private bool _isPreviewActive = false;
+    private bool _isDragging = false;
 
     // ========== INITIALIZATION ==========
 
@@ -31,14 +32,18 @@ public class ManaUIPresenter : MonoBehaviour
             UpdateAllOrbs(); // Initial state
         }
 
-        // Subscribe to hover events
+        // Subscribe to hover and drag events
         EventBus.Subscribe<PlayerHoverChangedEvent>(OnPlayerHoverChanged);
+        EventBus.Subscribe<CardDragBeginEvent>(OnDragBegin);
+        EventBus.Subscribe<CardDragEndEvent>(OnDragEnd);
     }
 
     private void OnDestroy()
     {
         UnsubscribeFromManaSystem();
         EventBus.Unsubscribe<PlayerHoverChangedEvent>(OnPlayerHoverChanged);
+        EventBus.Unsubscribe<CardDragBeginEvent>(OnDragBegin);
+        EventBus.Unsubscribe<CardDragEndEvent>(OnDragEnd);
     }
 
     private void SubscribeToManaSystem()
@@ -75,10 +80,25 @@ public class ManaUIPresenter : MonoBehaviour
         // Orbs already updated via OnManaChanged
     }
 
+    // ========== DRAG EVENTS ==========
+
+    private void OnDragBegin(CardDragBeginEvent e)
+    {
+        _isDragging = true;
+    }
+
+    private void OnDragEnd(CardDragEndEvent e)
+    {
+        _isDragging = false;
+    }
+
     // ========== HOVER EVENTS ==========
 
     private void OnPlayerHoverChanged(PlayerHoverChangedEvent e)
     {
+        // Ignore hover changes while dragging to prevent preview flickering
+        if (_isDragging) return;
+
         if (e.Hovered == null)
         {
             // No longer hovering

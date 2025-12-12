@@ -12,7 +12,8 @@ public class HandLayoutPresenter : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private HandSplineLayout playerHandLayout;
-    [SerializeField] private UiRegistry uiRegistry;
+    
+    private UiRegistry uiRegistry;
 
     private Board _board;
 

@@ -5,7 +5,6 @@ public class SlotHighlightPresenter : MonoBehaviour
 {
     private readonly HashSet<UiSlot> _valid = new();
     private UiSlot _hot;
-
     private Board board;
     private UiRegistry uiBoard;
 
@@ -38,6 +37,7 @@ public class SlotHighlightPresenter : MonoBehaviour
             _hot.SetHighlightLevel(SlotHighlightLevel.Available);
             _hot = null;
         }
+
         foreach (var s in _valid)
             s.SetHighlightLevel(SlotHighlightLevel.Off);
         _valid.Clear();
@@ -81,6 +81,7 @@ public class SlotHighlightPresenter : MonoBehaviour
         var instance = dragging.cardInstance;
         var from = instance?.CurrentSlot;
         var to = uiSlot.ModelSlot;
+
         if (instance == null || from == null || to == null)
             return;
 
@@ -93,6 +94,9 @@ public class SlotHighlightPresenter : MonoBehaviour
 
         _hot = uiSlot;
         _hot.SetHighlightLevel(SlotHighlightLevel.Hot);
+
+        // Notify listeners (SfxPlayer, etc.)
+        EventBus.Publish(new SlotHighlightHotEvent(uiSlot));
     }
 
     private void OnSlotExit(SlotPointerExitEvent e)

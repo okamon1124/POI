@@ -104,7 +104,7 @@ RectTransform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 3645903485324772303}
   - {fileID: 128035584959259259}
@@ -169,7 +169,7 @@ MonoBehaviour:
   highlightLight: {fileID: 3597913480802521802}
   offIntensity: 0
   availableIntensity: 2.5
-  hotIntensity: 5
+  hotIntensity: 8
   fadeDuration: 0.2
   ease: 6
 --- !u!1 &7543028307689210305

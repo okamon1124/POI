@@ -1,77 +1,84 @@
 ﻿using UnityEngine;
 
+/// <summary>
+/// Presenter that creates UiCard instances when cards are spawned onto the board (non-hand zones).
+/// Listens to Board.OnCardSpawned and creates the visual representation.
+/// </summary>
 public class BoardCardSpawnPresenter : MonoBehaviour
 {
-    private Board board;
-    private UiRegistry uiRegistry;
+    private Board _board;
+    private UiRegistry _uiRegistry;
+    private CardInputPolicy _inputPolicy;
 
     [Header("Prefab & Parent")]
     [SerializeField] private UiCard cardPrefab;
 
     /// <summary>
-    /// 場上卡片的父物件（一般放在 Board UI root 下面）
+    /// Parent for board cards (usually under Board UI root)
     /// </summary>
     [SerializeField] private RectTransform boardCardsRoot;
 
-    public void Initialize(Board boardController, UiRegistry uiReg)
+    public void Initialize(Board board, UiRegistry uiRegistry, CardInputPolicy inputPolicy)
     {
-        if (board != null)
-            board.OnCardSpawned -= OnCardSpawned;
+        // Unsubscribe from old board if re-initializing
+        if (_board != null)
+            _board.OnCardSpawned -= OnCardSpawned;
 
-        board = boardController;
-        uiRegistry = uiReg;
+        _board = board;
+        _uiRegistry = uiRegistry;
+        _inputPolicy = inputPolicy;
 
-        if (board != null)
-            board.OnCardSpawned += OnCardSpawned;
+        if (_board != null)
+            _board.OnCardSpawned += OnCardSpawned;
     }
 
     private void OnDestroy()
     {
-        if (board != null)
-            board.OnCardSpawned -= OnCardSpawned;
+        if (_board != null)
+            _board.OnCardSpawned -= OnCardSpawned;
     }
 
     private void OnCardSpawned(CardInstance instance, Slot slot)
     {
-        // ⭐ 這個 Presenter 只處理「非手牌」的生成
+        // This presenter only handles non-hand spawns
         if (slot.Zone.Type == ZoneType.Hand)
             return;
 
-        // 1) 找到對應的 UiSlot（一定要用 registry 查）
-        UiSlot uiSlot = uiRegistry.GetUiSlot(slot);
+        // 1) Find the corresponding UiSlot
+        UiSlot uiSlot = _uiRegistry.GetUiSlot(slot);
         if (uiSlot == null)
         {
             Debug.LogWarning($"[BoardCardSpawnPresenter] No UiSlot found for Slot in Zone {slot.Zone.Type} index {slot.Index}");
             return;
         }
 
-        // 2) 該位置已經有卡？通常不允許
+        // 2) Check if slot already has a card
         if (uiSlot.Occupants.Count > 0)
         {
             Debug.LogWarning($"[BoardCardSpawnPresenter] Slot {uiSlot.name} already contains a card.");
             return;
         }
 
-        // 3) Instantiate 卡片
+        // 3) Instantiate the card
         UiCard uiCard = Instantiate(cardPrefab, boardCardsRoot);
         uiCard.cardInstance = instance;
-        uiCard.BindRegistry(uiRegistry);
 
-        // 註冊到 registry
-        uiRegistry.Register(uiCard);
+        // 4) Bind dependencies
+        uiCard.BindRegistry(_uiRegistry);
+        uiCard.BindInputPolicy(_inputPolicy);
+        _uiRegistry.Register(uiCard);
 
-        // 4) 把卡片移動到 slot (不用動畫，直接對齊)
+        // 5) Position card at slot (no animation, direct placement)
         var cardRT = uiCard.GetComponent<RectTransform>();
         var slotRT = uiSlot.RectTransform;
-
         cardRT.position = slotRT.position;
         cardRT.rotation = slotRT.rotation;
         cardRT.localScale = Vector3.one * 1.1f;
 
-        // 5) 讓 slot 記得這張 UI 卡片
+        // 6) Let slot track this UI card
         uiSlot.AttachCard(uiCard);
 
-        // 6) 更新卡面
+        // 7) Update card visuals
         uiCard.RefreshVisual();
     }
 }

@@ -54,6 +54,9 @@ public class GameController : MonoBehaviour
     public PhaseManager PhaseManager { get; private set; }
     public ManaSystem PlayerManaSystem { get; private set; }
 
+    // Services
+    public CardInputPolicy InputPolicy { get; private set; }
+
     private Deck _playerDeck;
     private PlayerState _playerState;
     private PlayerState _enemyState;
@@ -118,21 +121,25 @@ public class GameController : MonoBehaviour
         PhaseManager.MovementAnimationDuration = movementAnimationDuration;
         PhaseManager.CombatAnimationDuration = combatAnimationDuration;
 
-        // 8. Subscribe to phase events
+        // 8. Create input policy (depends on PhaseManager)
+        InputPolicy = new CardInputPolicy();
+        InputPolicy.Initialize(PhaseManager);
+
+        // 9. Subscribe to phase events
         PhaseManager.OnPhaseEntered += OnPhaseEntered;
         PhaseManager.OnPhaseExited += OnPhaseExited;
         PhaseManager.OnTurnCompleted += OnTurnCompleted;
 
-        // 9. Subscribe to board events for mana spending
+        // 10. Subscribe to board events for mana spending
         Board.OnCardMoved += OnCardMovedForMana;
 
-        // 10. Initialize presenters
+        // 11. Initialize presenters
         InitializePresenters();
 
-        // 11. Initialize input handlers
+        // 12. Initialize input handlers
         InitializeInputHandlers();
 
-        // 12. Bind UI slots to model slots
+        // 13. Bind UI slots to model slots
         BindBoardSlots(zoneToGroup);
         ConfigureSlotPaths(zoneToGroup);
 
@@ -141,8 +148,8 @@ public class GameController : MonoBehaviour
 
     private void InitializePresenters()
     {
-        cardDrawPresenter.Initialize(Board, uiRegistry);
-        boardCardSpawnPresenter.Initialize(Board, uiRegistry);
+        cardDrawPresenter.Initialize(Board, uiRegistry, InputPolicy);
+        boardCardSpawnPresenter.Initialize(Board, uiRegistry, InputPolicy);
         cardAvailabilityPresenter.Initialize(Board, uiRegistry, PhaseManager);
         slotHighlightPresenter.Initialize(Board, uiRegistry);
         cardMovementPresenter.Initialize(Board);
@@ -169,7 +176,8 @@ public class GameController : MonoBehaviour
 
     private void InitializeInputHandlers()
     {
-        cardDropInputHandler.Initialize(Board, PhaseManager);
+        // Pass InputPolicy instead of PhaseManager
+        cardDropInputHandler.Initialize(Board, InputPolicy);
 
         // Phase input handler needs PhaseManager
         if (phaseInputHandler != null)
@@ -324,16 +332,13 @@ public class GameController : MonoBehaviour
     private void OnMainPhaseEntered()
     {
         //Debug.Log("[GameController] Main Phase - Player can play cards");
-        // TODO: Enable "End Main Phase" button in UI
-        // TODO: Enable card dragging
-        // TODO: Update mana display (when implemented)
+        // NOTE: Card drag permissions are now handled by CardInputPolicy
     }
 
     private void OnMainPhaseExited()
     {
         //Debug.Log("[GameController] Main Phase ended");
-        // TODO: Disable "End Main Phase" button
-        // TODO: Disable card dragging if needed
+        // NOTE: Card drag permissions are now handled by CardInputPolicy
     }
 
     private void OnMovementPhaseEntered()
@@ -538,5 +543,8 @@ public class GameController : MonoBehaviour
         {
             Board.OnCardMoved -= OnCardMovedForMana;
         }
+
+        // Dispose input policy
+        InputPolicy?.Dispose();
     }
 }

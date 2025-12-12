@@ -211,7 +211,7 @@ MonoBehaviour:
   orbLight: {fileID: 9089010164542678382}
   availableBrightness: 1
   spentBrightness: 0.3
-  previewAffordableMin: 0.8
+  previewAffordableMin: 0.5
   previewAffordableMax: 1
   previewUnaffordableMin: 0.3
   previewUnaffordableMax: 0.3
@@ -219,7 +219,7 @@ MonoBehaviour:
   breathingSpeed: 1
   brightnessEase: 6
   breathingEase: 4
-  breathingScaleMax: 1.1
+  breathingScaleMax: 1.2
 --- !u!225 &7965975905634876922
 CanvasGroup:
   m_ObjectHideFlags: 0
