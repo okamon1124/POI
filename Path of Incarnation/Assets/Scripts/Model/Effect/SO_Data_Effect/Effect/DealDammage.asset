@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21d48f0fb7cacb84c9cc491bc406dde1, type: 3}
+  m_Name: DealDammage
+  m_EditorClassIdentifier: Assembly-CSharp::Effect
+  effectName: Deal_1_Dmg_toAnyCreature
+  description: Deal 1 Dmg to any creature
+  steps:
+  - targetType: 2
+    targetingMode: 1
+    targetCount: 1
+    filters:
+    - {fileID: 11400000, guid: 8760d4e2531b95f499235b8f09219c0f, type: 2}
+    - {fileID: 11400000, guid: 090d1e6a61fa84f4bb424e08354dd938, type: 2}
+    readFromKey: 
+    writeTargetsToKey: 
+    subEffect: {fileID: 11400000, guid: edef326c61a223b408f3f03799ff6d08, type: 2}
+    optional: 0
+  requireAllTargetsUpfront: 0

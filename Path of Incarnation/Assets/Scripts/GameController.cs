@@ -499,7 +499,7 @@ public class GameController : MonoBehaviour
             return;
         }
 
-        var result = Board.BeginMainCombat(_playerState, _enemyState);
+        var result = Board.BeginMainCombat(_playerState, _enemyState, isPlayerTurn: true);
 
         if (result == null)
         {

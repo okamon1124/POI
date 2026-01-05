@@ -120,7 +120,7 @@ public class Board
     /// 外部呼叫：開始主戰鬥線。
     /// 這裡會先算出 CombatResult，丟 event，並把 result 回傳。
     /// </summary>
-    public CombatResult BeginMainCombat(PlayerState playerState, PlayerState enemyState)
+    public CombatResult BeginMainCombat(PlayerState playerState, PlayerState enemyState, bool isPlayerTurn)
     {
         if (MainCombatLane == null)
         {
@@ -128,12 +128,10 @@ public class Board
             return null;
         }
 
-        // 這裡只算，不做 Apply
-        var result = CombatSystem.Resolve(playerState, enemyState, MainCombatLane);
+        var result = CombatSystem.Resolve(playerState, enemyState, MainCombatLane, isPlayerTurn);
         if (result == null)
             return null;
 
-        // 通知 Presenter：「這回合的預言書在這裡」
         OnCombatBegin?.Invoke(result);
 
         return result;

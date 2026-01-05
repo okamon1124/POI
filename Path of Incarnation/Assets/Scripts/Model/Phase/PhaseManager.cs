@@ -124,7 +124,7 @@ public class PhaseManager
             PhaseType.Main => new MainPhase(this),
             PhaseType.Movement => new MovementPhase(this, _board),
             PhaseType.Combat => new CombatPhase(this, _board, _playerState, _enemyState),
-            PhaseType.EnemyTurn => new EnemyTurnPhase(this),
+            PhaseType.EnemyTurn => new EnemyTurnPhase(this, _board, _playerState, _enemyState),  // Updated
             _ => throw new NotImplementedException($"Phase {phaseType} not implemented")
         };
     }

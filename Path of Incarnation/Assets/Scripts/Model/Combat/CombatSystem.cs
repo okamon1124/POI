@@ -3,22 +3,22 @@ public static class CombatSystem
     public static CombatResult Resolve(
         PlayerState player,
         PlayerState enemy,
-        CombatLane lane)
+        CombatLane lane,
+        bool isPlayerTurn)
     {
         var ctx = new CombatContext(player, enemy, lane);
 
-        // 玩家這側：整條 path 上所有卡都有機會套用規則
-        foreach (var slot in lane.PlayerPath)
+        if (isPlayerTurn)
         {
-            var card = slot.InSlotCardInstance;
-            ApplyRules(card, ctx, isPlayerSide: true);
+            // Player's turn: only player's creature in combat slot attacks
+            var attacker = lane.PlayerCombatSlot.InSlotCardInstance;
+            ApplyRules(attacker, ctx, isPlayerSide: true);
         }
-
-        // 敵人這側
-        foreach (var slot in lane.EnemyPath)
+        else
         {
-            var card = slot.InSlotCardInstance;
-            ApplyRules(card, ctx, isPlayerSide: false);
+            // Enemy's turn: only enemy's creature in combat slot attacks
+            var attacker = lane.EnemyCombatSlot.InSlotCardInstance;
+            ApplyRules(attacker, ctx, isPlayerSide: false);
         }
 
         return ctx.ToResult();

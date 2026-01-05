@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-public class CardInstance
+public class CardInstance: ITargetable
 {
     // Static counter for draw order - each new card gets the next number
     private static int _nextDrawOrder = 0;
@@ -11,6 +11,13 @@ public class CardInstance
     public int CurrentPower { get; set; }
     public int CurrentSpeed { get; set; }
     public int CurrentHealth { get; set; }
+
+    public TargetType TargetType =>
+        Data?.cardType == CardType.Creature ? TargetType.Creature : TargetType.Card;
+
+    public bool IsValidTarget => CurrentHealth > 0 && CurrentSlot != null;
+
+    public string DisplayName => Data?.cardName ?? "Unknown Card";
 
     /// <summary>
     /// Order in which this card was created/drawn.

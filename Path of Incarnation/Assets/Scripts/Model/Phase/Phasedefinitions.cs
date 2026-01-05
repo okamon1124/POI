@@ -246,7 +246,7 @@ public class CombatPhase : IPhase
         Debug.Log("[CombatPhase] Resolving combat...");
 
         // Trigger combat on the main combat lane
-        CombatResult result = _board.BeginMainCombat(_playerState, _enemyState);
+        CombatResult result = _board.BeginMainCombat(_playerState, _enemyState, isPlayerTurn: true);
 
         _animationTimer = 0f;
         _hasAdvanced = false;
@@ -314,28 +314,51 @@ public class CombatPhase : IPhase
 public class EnemyTurnPhase : IPhase
 {
     private readonly PhaseManager _manager;
+    private readonly Board _board;
+    private readonly PlayerState _playerState;
+    private readonly PlayerState _enemyState;
 
     private float _timer = 0f;
-    private const float TURN_TRANSITION_DELAY = 0.2f; // Small delay for cleanup
+    private float _totalDuration = 0f;
     private bool _hasAdvanced = false;
 
-    public EnemyTurnPhase(PhaseManager manager)
+    private const float TURN_TRANSITION_DELAY = 0.2f;
+    private const float COMBAT_ANIMATION_DURATION = 1.0f;
+
+    public EnemyTurnPhase(PhaseManager manager, Board board, PlayerState playerState, PlayerState enemyState)
     {
         _manager = manager;
+        _board = board;
+        _playerState = playerState;
+        _enemyState = enemyState;
     }
 
     public void OnEnter()
     {
-        Debug.Log("[EnemyTurn] Enemy turn (AI not implemented yet)");
+        Debug.Log("[EnemyTurn] Enemy turn starting...");
 
         _timer = 0f;
         _hasAdvanced = false;
+        _totalDuration = TURN_TRANSITION_DELAY;
 
-        // TODO: Implement AI logic here:
-        // - Enemy draws card
-        // - Enemy plays cards
-        // - Enemy creatures advance
-        // - Enemy combat
+        // TODO: Enemy draws card
+        // TODO: Enemy plays cards
+        // TODO: Enemy creatures advance (call _board.AdvanceAllOneStep() for enemy side)
+
+        // Enemy combat - enemy attacks
+        CombatResult result = _board.BeginMainCombat(_playerState, _enemyState, isPlayerTurn: false);
+
+        if (result != null)
+        {
+            Debug.Log($"[EnemyTurn] Enemy combat resolved. Player HP: {_playerState.Health}, Enemy HP: {_enemyState.Health}");
+            _totalDuration = COMBAT_ANIMATION_DURATION;
+
+            CheckGameEnd();
+        }
+        else
+        {
+            Debug.Log("[EnemyTurn] No enemy combat (no enemy creature in combat zone)");
+        }
     }
 
     public void OnUpdate()
@@ -344,7 +367,7 @@ public class EnemyTurnPhase : IPhase
 
         _timer += UnityEngine.Time.deltaTime;
 
-        if (_timer >= TURN_TRANSITION_DELAY)
+        if (_timer >= _totalDuration)
         {
             _manager.AdvanceToNextPhase();
             _hasAdvanced = true;
@@ -352,4 +375,17 @@ public class EnemyTurnPhase : IPhase
     }
 
     public void OnExit() { }
+
+    private void CheckGameEnd()
+    {
+        if (_playerState.Health <= 0)
+        {
+            Debug.Log("[EnemyTurn] Player defeated!");
+        }
+
+        if (_enemyState.Health <= 0)
+        {
+            Debug.Log("[EnemyTurn] Enemy defeated! Victory!");
+        }
+    }
 }
