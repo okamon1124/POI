@@ -137,4 +137,48 @@ public class ManaSystem
     {
         return $"[ManaSystem {Owner}] {CurrentMana}/{MaxMana} (cap: {AbsoluteMaxMana})";
     }
+
+    // Add this field:
+    private Board _boundBoard;
+
+    /// <summary>
+    /// Binds this mana system to a board to automatically spend mana when cards are played.
+    /// </summary>
+    public void BindToBoard(Board board)
+    {
+        if (_boundBoard != null)
+        {
+            UnbindFromBoard(_boundBoard);
+        }
+
+        _boundBoard = board;
+        _boundBoard.OnCardMoved += OnCardMoved;
+    }
+
+    /// <summary>
+    /// Unbinds from the board, stopping automatic mana spending.
+    /// </summary>
+    public void UnbindFromBoard(Board board)
+    {
+        if (board != null && _boundBoard == board)
+        {
+            _boundBoard.OnCardMoved -= OnCardMoved;
+            _boundBoard = null;
+        }
+    }
+
+    private void OnCardMoved(CardInstance card, Slot fromSlot, Slot toSlot)
+    {
+        if (card.Owner != Owner)
+            return;
+
+        if (fromSlot == null || fromSlot.Zone.Type != ZoneType.Hand)
+            return;
+
+        int cost = card.Data.manaCost;
+        if (cost > 0 && !TrySpendMana(cost, out var reason))
+        {
+            Debug.LogWarning($"[ManaSystem] Failed to spend mana for {card.Data.cardName}: {reason}");
+        }
+    }
 }

@@ -17,7 +17,7 @@ public class EffectSystemTest : MonoBehaviour
 {
     [Header("References")]
     [Tooltip("Reference to your GameController to get Board, PlayerState, Deck")]
-    [SerializeField] private GameController gameController;
+    [SerializeField] private GameBootstrapper gameController;
 
     [Header("Test Effects")]
     [SerializeField] private Effect drawEffect;
@@ -152,7 +152,7 @@ public class EffectSystemTest : MonoBehaviour
         Deck playerDeck = null;
 
         // Try to get via reflection (for testing only)
-        var type = typeof(GameController);
+        var type = typeof(GameBootstrapper);
 
         var playerStateField = type.GetField("_playerState", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         if (playerStateField != null)
